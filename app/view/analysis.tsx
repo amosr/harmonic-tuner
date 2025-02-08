@@ -52,20 +52,7 @@ function setPeaks(t: T, freq: number, harmonics: Array<number>) {
   t.strober.port.postMessage(harmonics.map(h => h * freq));
 }
 
-// function find_peaks(arr: Uint8Array, threshold=100): Array<number> {
-//   const found: Array<number> = [];
-//   arr.forEach((v,i) => {
-//     if (i > 0 && i < arr.length) {
-//       if (v > threshold && v > arr[i - 1] && v >= arr[i + 1]) {
-//         found.push(i);
-//       }
-//     }
-//   });
-//   return found;
-// }
-
 export function Analysis() {
-  // const [peaksText, setPeaksText] = React.useState("");
   const [trigger, setTrigger] = React.useState(false);
 
   const [t, setT] = React.useState<T | null>(null);
@@ -75,9 +62,7 @@ export function Analysis() {
     if (t) {
       t.analyser.getByteFrequencyData(t.bytes);
 
-      // const peaks = find_peaks(t.bytes);
       const samp = t.audio.sampleRate / t.bytes.length / 2;
-      // setPeaksText(peaks.map(i => [i * samp, ((i+1)*samp) / (i*samp)]).toString());
 
       const canv = canvas.current;
       const ctx = canv?.getContext('2d');
@@ -95,17 +80,8 @@ export function Analysis() {
           const v = t.bytes[i];
           ctx.fillStyle = `rgb(${v}, ${v}, ${v})`;
           ctx.fillRect(x, 0, w_per_bucket, h);
-          // ctx.fillStyle = `rgb(${255-v}, ${v}, ${v})`;
-          // ctx.strokeRect(x, 0, w_per_bucket, h);
-          // ctx.moveTo(x, )
         }
 
-        // peaks.forEach(i => {
-        //   const v = t.bytes[i];
-        //   const txt = (i * samp).toString();
-        //   ctx.fillStyle = `rgb(${255-v}, ${255-v}, ${255-v})`;
-        //   ctx.fillText(txt, w_per_bucket * i, 100);
-        // });
       }
 
 
@@ -135,6 +111,5 @@ export function Analysis() {
   return (<>
   <p><a className="button is-primary" onClick={onConnect}>{ t ? "disconnect" : "connect" }</a></p>
   <canvas ref={canvas} width="1024" height="300" />
-  {/* <p>{peaksText}</p> */}
   </>);
 }
