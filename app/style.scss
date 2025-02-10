@@ -1,0 +1,35 @@
+// @use "bulma/sass/utilities/initial-variables";
+
+// 600kb?!
+@use "bulma";
+
+:root {
+  --bulma-primary-h: 203deg;
+  --bulma-primary-s: 50%;
+  --bulma-link-h: 244deg;
+  --bulma-link-s: 50%;
+  --bulma-info-h: 178deg;
+  --bulma-info-s: 50%;
+  --bulma-success-h: 140deg;
+  --bulma-success-s: 50%;
+  --bulma-warning-s: 50%;
+  --bulma-danger-s: 50%;
+}
+
+
+
+// Load Bulma's base styles and themes (including the minireset)
+// @use "bulma/sass/base";
+// light+dark adds 200kb?
+// @use "bulma/sass/themes";
+
+// Load other Bulma components
+// @use "bulma/sass/elements/button";
+// @use "bulma/sass/components/message";
+
+// @use "bulma/sass/utilities/mixins";
+
+// .bulma-fa-mixin {
+//   @include mixins.fa(1rem, 2rem);
+//   background-color: lavender; // For demo purposes
+// }

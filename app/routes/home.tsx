@@ -13,7 +13,7 @@ export function meta({}: Route.MetaArgs) {
 export default function Home() {
   return <>
     {/* <Welcome /> */}
-    <Options />
+    {/* <Options /> */}
     <Analysis />
   </>;
 }

@@ -1,3 +1,8 @@
-import { type RouteConfig, index } from "@react-router/dev/routes";
+import { type RouteConfig, type RouteConfigEntry, index, prefix } from "@react-router/dev/routes";
 
-export default [index("routes/home.tsx")] satisfies RouteConfig;
+const routes: RouteConfigEntry[] =
+  prefix("/tuner", [
+  index("routes/home.tsx")
+  ])
+
+export default routes satisfies RouteConfig;
