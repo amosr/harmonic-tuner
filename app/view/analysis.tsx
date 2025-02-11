@@ -1,73 +1,17 @@
 import React from "react";
 
-// class StrobeX {
-//   constructor(public freq: number, public angle: number) {}
-// }
-// let x = new StrobeX();
-
-type Strobe = {
-  freq: number;
-  angle: number;
-  angle_diff: number;
-  norm: number;
-}
-
-type StrobeMessage = {
-  strobes: Array<Strobe>;
-  rms: number;
-}
-
-type T = {
-  audio: AudioContext;
-  analyser: AnalyserNode;
-  media: MediaStream;
-  bytes: Uint8Array;
-  floats: Float32Array;
-  strober: AudioWorkletNode;
-  stroberMessage: StrobeMessage;
-};
-
-async function init(): Promise<T> {
-  const audio = new AudioContext();
-  await audio.audioWorklet.addModule("worklet/strobe.js");
-  const media = await navigator.mediaDevices.getUserMedia({audio: true});
-  const source = audio.createMediaStreamSource(media);
-  const analyser = audio.createAnalyser();
-
-  analyser.fftSize = 4096;
-  analyser.smoothingTimeConstant = 0.8;
-  source.connect(analyser);
-
-  const bytes = new Uint8Array(analyser.frequencyBinCount);
-  const floats = new Float32Array(analyser.frequencyBinCount);
-
-  const strober = new AudioWorkletNode(audio, "strobe-processor", { processorOptions: { sampleRate: audio.sampleRate } });
-  source.connect(strober);
-
-  const stroberMessage = { strobes: [], rms: 0 };
-  const result = { audio, analyser, media, bytes, floats, strober, stroberMessage };
-  strober.port.onmessage = (e) => {
-    result.stroberMessage = e.data;
-  };
-
-  return result;
-}
-
-function setPeaks(t: T, freq: number, harmonics: Array<number>, tapGenFreq: number | null) {
-  t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq });
-  t.stroberMessage = { strobes: [], rms: 0 };
-}
+import * as Tuner from "../tuner";
 
 export function Analysis() {
   const [trigger, setTrigger] = React.useState(false);
   const [textStatus, setTextStatus] = React.useState("");
 
-  const [t, setT] = React.useState<T | null>(null);
+  const [t, setT] = React.useState<Tuner.T | null>(null);
   const canvas = React.createRef<HTMLCanvasElement>();
   const txtGenFreq = React.createRef<HTMLInputElement>();
   const txtReceptFreq = React.createRef<HTMLInputElement>();
 
-  const last_strobes = React.useRef<Array<Strobe>>([]);
+  const last_strobes = React.useRef<Array<Tuner.Strobe>>([]);
 
   const [harmonics, setHarmonics] = React.useState<boolean[]>([false,true, false, false, true, false, false, false, false, false, true])
   const [harmonicsx, setHarmonicsx] = React.useState<Map<number,boolean>>(new Map([[1, true], [3, true]]))
@@ -97,9 +41,7 @@ export function Analysis() {
         for (let i = 0; i != count; ++i) {
           const x = w_per_bucket * i;
           const freq = (t.audio.sampleRate / (count / i));
-          // if (freq < 500)
-          //   console.log(x, freq);
-          const v = t.bytes[i];
+          const v = Math.pow(t.bytes[i] / 255, 2) * 255;
           ctx.fillStyle = `rgb(${v / 8}, ${v / 2}, ${v / 8})`;
           ctx.fillRect(x, 0, w_per_bucket, h);
         }
@@ -208,7 +150,7 @@ export function Analysis() {
       if (connecting)
         return;
       setConnecting(true);
-      tt = await init();
+      tt = await Tuner.init({});
       console.log('done', t, tt, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
       setT(tt);
       return;
@@ -235,7 +177,7 @@ export function Analysis() {
         if (en) harm_en.push(ix);
       });
       console.log('setPeaks', tt, receptFreq, harmonics, harm_en, genFreq);
-      setPeaks(tt, receptFreq, harm_en, genFreq);
+      Tuner.setPeaks(tt, receptFreq, harm_en, genFreq);
     }
     minmaxs.current = [];
 
@@ -276,8 +218,7 @@ export function Analysis() {
     {harmonics.map((en,ix) =>
       <label className="checkbox" key={ix}>
             <input type="checkbox" value={ix} checked={en} onChange={e => {
-              let hh = harmonics.map(x => x);
-              hh[ix] = e.target.checked;
+              let hh = harmonics.map((x,i) => (i == ix) ? e.target.checked : x);
               setHarmonics(hh);
               onUpdate(hh);
             }} /> {ix}

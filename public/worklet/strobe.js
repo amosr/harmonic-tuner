@@ -14,10 +14,10 @@ class StrobeProcessor extends AudioWorkletProcessor {
     super(options);
 
     this.sampleRate = options.processorOptions.sampleRate;
-    this.updateEverySample = options.processorOptions.updateEverySample ?? 5;
-    this.filterNorm = options.processorOptions?.filterNorm ?? 0.99;
-    this.filterRms = options.processorOptions?.filterRms ?? 0.99;
-    this.filterAngle = options.processorOptions?.filterAngle ?? 0.99;
+    this.updatePeriod = options.processorOptions.updatePeriod ?? 5;
+    this.filterNorm = options.processorOptions.filterNorm ?? 0.99;
+    this.filterRms = options.processorOptions.filterRms ?? 0.99;
+    this.filterAngle = options.processorOptions.filterAngle ?? 0.99;
 
     this.updateEvery = 0;
     this.rms = 0.0;
@@ -106,11 +106,9 @@ class StrobeProcessor extends AudioWorkletProcessor {
     this.rms = this.rms * this.filterRms + rms * (1.0 - this.filterRms);
 
     this.updateEvery--;
-    if (this.updateEvery <= 0 && this.strobes.length > 0) {
-    // if (this.updateEvery <= 0 && rms > 0.001 && this.strobes.length > 0 && this.strobes[0].norm > 0.01) {
-      this.updateEvery = this.updateEverySample;
+    if (this.updateEvery <= 0) {
+      this.updateEvery = this.updatePeriod;
       this.port.postMessage({ strobes: this.strobes, rms: this.rms });
-      // console.log("strobes", this.strobes);
     }
 
     return true;
