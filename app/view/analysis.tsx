@@ -2,6 +2,79 @@ import React from "react";
 
 import * as Tuner from "../tuner";
 
+function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>) {
+  ctx.clearRect(0, 0, canv.width, canv.height);
+
+  const count = t.bytes.length;
+  const w_per_bucket = Tuner.getWOfBucket(t);
+  const h = canv.height;
+
+  for (let i = 0; i != count; ++i) {
+    const x = Tuner.getXOfBucket(t, i);
+    const v = Tuner.getAmplitudeOfBucket(t, i);
+    ctx.fillStyle = `rgb(${v / 8}, ${v / 2}, ${v / 8})`;
+    ctx.fillRect(x, 0, w_per_bucket, h);
+  }
+
+  for (let i = 0; i != strobes.length; ++i) {
+    let strobe = strobes[i];
+    const x = Tuner.getXOfFreq(t, strobe.freq);
+
+    let n = strobe.norm;
+
+    let [r,g,b] =
+      (Math.abs(strobe.angle_diff) <= 0.0003) ? [255, 0, 255] :
+      (strobe.angle_diff == 0) ? [255, 0, 255] :
+      (strobe.angle_diff >  0) ? [0, 0, 255] : [255, 0, 0];
+
+    // const g = 255 - Math.abs(strobe.angle_diff) * 50000; // Math.min(255, strobe.norm*1000);
+    // const r = -Math.min(strobe.angle_diff, 0) * 50000;
+    // const b = Math.max(strobe.angle_diff, 0) * 50000;
+    const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
+    const w = n * 10;
+    const hh = n * h / 4;
+
+    if (n > 0) {
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x - w/2, y - hh/2, w, hh);
+    }
+
+    // let mm = minmaxs.current[i];
+    // if (!mm) {
+    //   mm = minmaxs.current[i] = { min: strobe.angle_diff, max: strobe.angle_diff, count: 0, sum: 0.0 };
+    // }
+    // mm.count++;
+    // mm.sum += strobe.angle_diff;
+    // if (strobe.angle_diff < mm.min)
+    //   mm.min = strobe.angle_diff;
+    // if (strobe.angle_diff > mm.max)
+    //   mm.max = strobe.angle_diff;
+
+
+
+
+
+    // if (i == 0)
+    //   setTextStatus(`[${mm.min.toFixed(4)},${mm.max.toFixed(4)}] (${mm.sum / mm.count}) ${txtReceptFreq.current?.value} ${txtGenFreq.current?.value}`);
+
+
+    ctx.lineWidth = 1.0;
+    const fontSize = 15;
+    ctx.font = `${fontSize}px monospace`;
+    ctx.strokeStyle = 'rgb(255,255,255)';
+
+    if (n > 0) {
+      ctx.strokeText(`${strobe.angle_diff.toFixed(4)}`, x + 1, h/2);
+      ctx.strokeText(`${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
+      ctx.strokeText(`${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
+      // ctx.strokeText(`${mm.min.toFixed(4)}:${mm.max.toFixed(4)}`, x + 1, h/2 + 25);
+    }
+
+    ctx.strokeText(`${strobe.freq}`, x - (fontSize * 0.25 * (strobe.freq.toString().length)), h - fontSize);
+  }
+
+}
+
 export function Analysis() {
   const [trigger, setTrigger] = React.useState(false);
   const [textStatus, setTextStatus] = React.useState("");
@@ -14,126 +87,42 @@ export function Analysis() {
   const last_strobes = React.useRef<Array<Tuner.Strobe>>([]);
 
   const [harmonics, setHarmonics] = React.useState<boolean[]>([false,true, false, false, true, false, false, false, false, false, true])
-  const [harmonicsx, setHarmonicsx] = React.useState<Map<number,boolean>>(new Map([[1, true], [3, true]]))
 
-  // const harmonics = [1,4,10];
-
-  let minmaxs = React.useRef<({min:number,max:number,count:number,sum:number}|null)[]>([]);
+  // let minmaxs = React.useRef<({min:number,max:number,count:number,sum:number}|null)[]>([]);
 
   const onRefresh = () => {
     if (t) {
-      t.analyser.getByteFrequencyData(t.bytes);
-
-      const freq_mul = 10;
+      Tuner.loadFrequencyData(t);
 
       const canv = canvas.current;
       const ctx = canv?.getContext('2d');
       if (canv && ctx) {
-        ctx.lineWidth = 0.1;
-        ctx.strokeStyle = '#f000f0';
-        ctx.clearRect(0, 0, canv.width, canv.height);
-
-        const count = t.bytes.length;
-        const w_per_bucket = (canv.width * freq_mul) / count;
-        const freq_to_x = (count / t.audio.sampleRate) * w_per_bucket * 2;
-        const h = canv.height;
-
-        for (let i = 0; i != count; ++i) {
-          const x = w_per_bucket * i;
-          const freq = (t.audio.sampleRate / (count / i));
-          const v = Math.pow(t.bytes[i] / 255, 2) * 255;
-          ctx.fillStyle = `rgb(${v / 8}, ${v / 2}, ${v / 8})`;
-          ctx.fillRect(x, 0, w_per_bucket, h);
-        }
 
         const msg = t.stroberMessage;
-        // setTextStatus(`rms ${msg.rms.toFixed(3)} ${msg.strobes.length > 0 && msg.strobes[0].norm}`);
+        setTextStatus(`rms ${msg.rms.toFixed(3)}`);
 
+        const strobes: Tuner.Strobe[] = [];
         for (let i = 0; i != msg.strobes.length; ++i) {
           let strobe = msg.strobes[i];
-          const x = strobe.freq * freq_to_x;
+          if (strobe.norm >= 0.10 && msg.rms > 0.001) {
+            last_strobes.current[i] = {...strobe};
+          } else if (last_strobes.current[i]) {
+            last_strobes.current[i].norm *= 0.95;
 
-          ctx.strokeStyle = 'rgb(255,255,255)';
-          ctx.lineWidth = 1.0;
-          ctx.font = '15px monospace';
-          ctx.strokeText(`${strobe.freq}`, x, 50);
+            strobe = {...strobe};
 
-          if (strobe.norm >= 0.30 && msg.rms > 0.001) {
-            last_strobes.current[i] = strobe;
-          } else {
-            strobe = last_strobes.current[i];
-            if (!strobe) {
-              continue;
-            }
-            strobe.norm *= 0.95;
             if (strobe.norm < 0.01) {
-              continue;
+              strobe.norm = 0.0;
             }
+          } else {
+            strobe.norm = 0.0;
           }
-          let n = strobe.norm;
-
-
-          const g = 255 - Math.abs(strobe.angle_diff) * 50000; // Math.min(255, strobe.norm*1000);
-          const r = -Math.min(strobe.angle_diff, 0) * 50000;
-          const b = Math.max(strobe.angle_diff, 0) * 50000;
-          const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
-          const w = n * 10;
-          const hh = n * h;
-
-          ctx.fillStyle = `rgb(${r},${g},${b})`;
-          ctx.fillRect(x - w/2, y - hh/2, w, hh);
-
-          ctx.strokeStyle = `rgb(${g},${g},${g})`;
-          ctx.lineWidth = 1.0;
-          ctx.font = '15px monospace';
-
-          let mm = minmaxs.current[i];
-          if (!mm) {
-            mm = minmaxs.current[i] = { min: strobe.angle_diff, max: strobe.angle_diff, count: 0, sum: 0.0 };
-          }
-          mm.count++;
-          mm.sum += strobe.angle_diff;
-          if (strobe.angle_diff < mm.min)
-            mm.min = strobe.angle_diff;
-          if (strobe.angle_diff > mm.max)
-            mm.max = strobe.angle_diff;
-
-
-          // [-0.2915,-0.2442] 285 -100
-          // [-0.0513,-0.0065] 285 -10
-          // [-0.0259,0.0188] 285 -1
-          // [-0.0228,0.0213] 285 0
-          // [-0.0203,0.0244] 285 1
-          // [0.0051,0.0495] 285 10
-          // [0.2619,0.3059] 285 100
-
-          // [-0.0126,0.0128] 440 0
-          // [-0.0086,0.0175] 440 1
-          // [0.0293,0.0567] 440 10
-          // [0.4243,0.4538] 440 100
-
-          // [-0.0013,0.0013] 570 0
-          // [0.0041,0.0071] 570 1
-          // [0.0524,0.0584] 570 10
-          // [0.5621,0.5746] 570 100
-
-          // [-0.0058,0.0058] 880 0
-          // [0.0026,0.0147] 880 1
-          // [0.0776,0.0937] 880 10
-          // [0.8724,0.8839] 880 100
-
-          if (i == 0)
-            setTextStatus(`[${mm.min.toFixed(4)},${mm.max.toFixed(4)}] (${mm.sum / mm.count}) ${txtReceptFreq.current?.value} ${txtGenFreq.current?.value}`);
-
-
-          // const nrm = Math.round(n * 100) / 100;
-          // const ang = Math.round(strobe.angle * 100) / 100;
-          // const ang_d = Math.round(strobe.angle_diff * 100) / 100;
-          ctx.strokeText(`${n.toFixed(2)}:${strobe.angle_diff.toFixed(4)}`, x + 1, h/2);
-          ctx.strokeText(`${mm.min.toFixed(4)}:${mm.max.toFixed(4)}`, x + 1, h/2 + 25);
+          strobes.push(strobe);
         }
 
+        renderCanvas(t, canv, ctx, strobes);
       }
+
 
 
       setTrigger(!trigger);
@@ -150,7 +139,11 @@ export function Analysis() {
       if (connecting)
         return;
       setConnecting(true);
-      tt = await Tuner.init({});
+      const opt = Tuner.makeOptions();
+      if (canvas.current?.width)
+        opt.display.canvasWidth = canvas.current?.width;
+      tt = await Tuner.init(opt);
+      console.log(opt);
       console.log('done', t, tt, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
       setT(tt);
       return;
@@ -176,12 +169,10 @@ export function Analysis() {
       harmonics.forEach((en,ix) => {
         if (en) harm_en.push(ix);
       });
-      console.log('setPeaks', tt, receptFreq, harmonics, harm_en, genFreq);
-      Tuner.setPeaks(tt, receptFreq, harm_en, genFreq);
+      Tuner.setStrobeFreqs(tt, receptFreq, harm_en, genFreq);
     }
-    minmaxs.current = [];
+    // minmaxs.current = [];
 
-    // onUpdateRecept();
     setTrigger(!trigger);
   };
 
@@ -190,10 +181,6 @@ export function Analysis() {
       onUpdate(harmonics);
       setConnecting(false);
     }
-    // if (connecting && t) {
-    //   onUpdate(harmonics);
-    //   setConnecting(false);
-    // }
   }, [t]);
 
   const onConnect = async () => {
@@ -228,6 +215,6 @@ export function Analysis() {
 
   <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /> (for testing accuracy, set to 1 to generate tone 1 cent sharp of receptive frequency)</label></p>
   <p style={{fontFamily: "monospace"}}>{textStatus}</p>
-  <canvas ref={canvas} width={document.body.clientWidth} height={1024} />
+  <canvas ref={canvas} width={document.body.clientWidth} height={600} />
   </>);
 }
