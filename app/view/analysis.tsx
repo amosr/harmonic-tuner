@@ -3,7 +3,7 @@ import React from "react";
 import * as Tuner from "../tuner";
 
 function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>) {
-  ctx.clearRect(0, 0, canv.width, canv.height);
+  // ctx.clearRect(0, 0, canv.width, canv.height);
 
   const count = t.bytes.length;
   const w_per_bucket = Tuner.getWOfBucket(t);
@@ -16,25 +16,50 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
     ctx.fillRect(x, 0, w_per_bucket, h);
   }
 
+  ctx.lineWidth = 1.0;
+  ctx.strokeStyle='rgb(255,255,255)';
+  ctx.beginPath();
+  ctx.moveTo(0, h/2);
+  ctx.lineTo(canv.width, h/2);
+  ctx.stroke();
+  ctx.closePath();
+
   for (let i = 0; i != strobes.length; ++i) {
-    let strobe = strobes[i];
+    const strobe = strobes[i];
     const x = Tuner.getXOfFreq(t, strobe.freq);
 
-    let n = strobe.norm;
+    ctx.beginPath();
+    ctx.moveTo(x, h/2 - 10);
+    ctx.lineTo(x, h/2 + 10);
+    ctx.stroke();
+
+    const n = strobe.norm;
+    // noisy, for position?
+    // const cents = Tuner.centsOfStrobe(strobe, false);
+    const cents = Tuner.centsOfStrobe(strobe, true);
+    // less noisy for text
+    const centsNum = Tuner.centsOfStrobe(strobe, true);
+    const vv = strobe.angle_diff_variance;
+
+    const display = n > 0;
 
     let [r,g,b] =
-      (Math.abs(strobe.angle_diff) <= 0.0003) ? [255, 0, 255] :
-      (strobe.angle_diff == 0) ? [255, 0, 255] :
-      (strobe.angle_diff >  0) ? [0, 0, 255] : [255, 0, 0];
+      (Math.abs(cents) <= 0.5) ? [255, 0, 255] :
+      (cents == 0) ? [255, 0, 255] :
+      (cents >  0) ? [0, 0, 255] :
+                     [255, 0, 0];
 
-    // const g = 255 - Math.abs(strobe.angle_diff) * 50000; // Math.min(255, strobe.norm*1000);
-    // const r = -Math.min(strobe.angle_diff, 0) * 50000;
-    // const b = Math.max(strobe.angle_diff, 0) * 50000;
-    const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
+    const y = (h / 2) + (
+      (cents >= 0) ?
+        Math.sqrt(cents / 500) * (h / 2) :
+        -Math.sqrt(-cents / 500) * (h / 2)
+    );
+
+    // const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
     const w = n * 10;
-    const hh = n * h / 4;
+    const hh = h / 8;
 
-    if (n > 0) {
+    if (display) {
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x - w/2, y - hh/2, w, hh);
     }
@@ -63,10 +88,10 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
     ctx.font = `${fontSize}px monospace`;
     ctx.strokeStyle = 'rgb(255,255,255)';
 
-    if (n > 0) {
-      ctx.strokeText(`${strobe.angle_diff.toFixed(4)}`, x + 1, h/2);
-      ctx.strokeText(`${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
-      ctx.strokeText(`${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
+    if (display) {
+      ctx.strokeText(`${centsNum > 0 ? '+' : ''}${centsNum.toFixed(0)} cents`, x + 1, h/2);
+      // ctx.strokeText(`${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
+      // ctx.strokeText(`${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
       // ctx.strokeText(`${mm.min.toFixed(4)}:${mm.max.toFixed(4)}`, x + 1, h/2 + 25);
     }
 
@@ -90,13 +115,21 @@ export function Analysis() {
 
   // let minmaxs = React.useRef<({min:number,max:number,count:number,sum:number}|null)[]>([]);
 
+  const updateEvery = React.useRef(0);
   const onRefresh = () => {
     if (t) {
+      setTrigger(!trigger);
+      // updateEvery.current--;
+      // if (updateEvery.current > 0)
+      //   return;
+      // updateEvery.current = 3;
+
       Tuner.loadFrequencyData(t);
 
       const canv = canvas.current;
       const ctx = canv?.getContext('2d');
       if (canv && ctx) {
+        ctx.reset();
 
         const msg = t.stroberMessage;
         setTextStatus(`rms ${msg.rms.toFixed(3)}`);
@@ -104,14 +137,14 @@ export function Analysis() {
         const strobes: Tuner.Strobe[] = [];
         for (let i = 0; i != msg.strobes.length; ++i) {
           let strobe = msg.strobes[i];
-          if (strobe.norm >= 0.10 && msg.rms > 0.001) {
-            last_strobes.current[i] = {...strobe};
+          if (strobe.norm >= 0.50 && msg.rms > 0.001 && strobe.angle_diff_variance < 0.50) {
+            last_strobes.current[i] = strobe;
           } else if (last_strobes.current[i]) {
             last_strobes.current[i].norm *= 0.95;
 
-            strobe = {...strobe};
+            strobe = last_strobes.current[i];
 
-            if (strobe.norm < 0.01) {
+            if (strobe.norm < 0.1) {
               strobe.norm = 0.0;
             }
           } else {
@@ -125,7 +158,6 @@ export function Analysis() {
 
 
 
-      setTrigger(!trigger);
     }
 
   };
@@ -133,7 +165,7 @@ export function Analysis() {
   const [connecting, setConnecting] = React.useState(false);
 
   const onUpdate = async (harmonics: boolean[]) => {
-    console.log(t, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
+    // console.log(t, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
     let tt = t;
     if (!tt) {
       if (connecting)
@@ -143,12 +175,12 @@ export function Analysis() {
       if (canvas.current?.width)
         opt.display.canvasWidth = canvas.current?.width;
       tt = await Tuner.init(opt);
-      console.log(opt);
-      console.log('done', t, tt, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
+      // console.log(opt);
+      // console.log('done', t, tt, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
       setT(tt);
       return;
     }
-    console.log(tt)
+    // console.log(tt)
 
     let receptFreq = null;
     let receptFreqTxt = txtReceptFreq.current?.value;
@@ -161,7 +193,7 @@ export function Analysis() {
     if (receptFreq && genFreqTxt) {
       const cents = parseFloat(genFreqTxt);
       genFreq = receptFreq * Math.pow(Math.pow(2, 1/1200), cents);
-      console.log(receptFreq, cents, genFreq)
+      // console.log(receptFreq, cents, genFreq)
     }
 
     if (receptFreq) {
@@ -171,6 +203,7 @@ export function Analysis() {
       });
       Tuner.setStrobeFreqs(tt, receptFreq, harm_en, genFreq);
     }
+    last_strobes.current = [];
     // minmaxs.current = [];
 
     setTrigger(!trigger);

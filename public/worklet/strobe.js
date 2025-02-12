@@ -1,12 +1,26 @@
-function Strobe(freq, sampleRate) {
-  const f = 2 * Math.PI * (freq / sampleRate);
-
-  return { freq: freq, f: f, sin: 0.0, cos: 1.0, angle: 0.0, norm: 0.0, angle_diff: 0.0, angle_diff_variance: 0.0 };
+function Osc(phase) {
+  return { sin: Math.sin(phase), cos: Math.cos(phase) };
 }
-function strobeGenSample(strobe) {
-  strobe.sin = strobe.sin + strobe.f * strobe.cos;
-  strobe.cos = strobe.cos - strobe.f * strobe.sin;
-  return strobe.sin;
+
+function oscGenSample(osc, f) {
+  osc.sin = osc.sin + f * osc.cos;
+  osc.cos = osc.cos - f * osc.sin;
+  return osc.sin;
+}
+
+function Strobe(freq, sampleRate, numGens) {
+  const f = 2 * Math.PI * (freq / sampleRate);
+  const gens = [];
+  const angles = [];
+  for (let i = 0; i != numGens; ++i) {
+    gens.push(Osc((2 * Math.PI / numGens) * i));
+    angles.push(0.0);
+  }
+
+  return { freq: freq, f: f, gens: gens, angles: angles, norm: 0.0, angle_diff: 0.0, angle_diff_variance: 0.0, angle_diff_filtered: 0.0 };
+}
+function strobeGenSample(strobe, gen) {
+  return oscGenSample(gen, strobe.f);
 }
 
 function CircularBuf(length) {
@@ -30,7 +44,9 @@ function arrayMean(data) {
   }
   return sum / data.length;
 }
+
 function arrayStddev(data) {
+  // xxx variance?
   const mean = arrayMean(data);
   let dev = 0.0;
   for (let i = 0; i != data.length; ++i) {
@@ -47,107 +63,135 @@ class StrobeProcessor extends AudioWorkletProcessor {
     super(options);
 
     this.sampleRate = options.processorOptions.sampleRate;
-    this.updatePeriod = options.processorOptions.updatePeriod ?? 5;
-    this.filterNorm = options.processorOptions.filterNorm ?? 0.99;
-    this.filterRms = options.processorOptions.filterRms ?? 0.99;
-    this.filterAngle = options.processorOptions.filterAngle ?? 0.99;
+    this.updatePeriod = options.processorOptions.updatePeriod;
+    this.filterNorm = options.processorOptions.filterNorm;
+    this.filterRms = options.processorOptions.filterRms;
+    this.filterAngle = options.processorOptions.filterAngle;
 
-    this.bufferLength = options.processorOptions.bufferLength ?? 10;
+    this.bufferLength = options.processorOptions.bufferLength;
+    this.phaseCount = options.processorOptions.phaseCount ?? 1;
 
     this.updateEvery = 0;
     this.rms = 0.0;
     this.strobes = [];
 
     this.buffers = [];
+    this.ss = [];
+    this.cc = [];
+    this.rms = 0.0;
 
     this.port.onmessage = (e) => {
       const data = e.data;
       const strobes = [];
       const buffers = [];
       data.freqs.forEach(f => {
-        strobes.push(Strobe(f, this.sampleRate))
-        buffers.push(CircularBuf(this.bufferLength));
+        strobes.push(Strobe(f, this.sampleRate, this.phaseCount))
+        buffers.push(CircularBuf(data.bufferLength));
       })
+      if (buffers[0])
+        console.log('circular buf', buffers[0].data.length);
+      this.filterAngle = data.filterAngle ?? this.filterAngle;
+      this.updatePeriod = data.updatePeriod ?? this.updatePeriod;
 
       this.strobes = strobes;
       this.buffers = buffers;
 
       if (data.tapGenFreq) {
-        this.tapGenFreq = Strobe(data.tapGenFreq, this.sampleRate);
+        this.tapGenFreq = Strobe(data.tapGenFreq, this.sampleRate, 1);
       } else {
         this.tapGenFreq = null;
       }
+
+      this.ss = Array(this.strobes.length * this.phaseCount);
+      this.cc = Array(this.strobes.length * this.phaseCount);
+      this.rms = 0.0;
     };
 
   }
 
   process(inputs, outputs, parameters) {
     const input = inputs[0][0];
-    const ss = Array(this.strobes.length);
-    const cc = Array(this.strobes.length);
-    for (let j = 0; j != this.strobes.length; ++j) {
+    const ss = this.ss;
+    const cc = this.cc;
+    for (let j = 0; j != ss.length; ++j) {
       ss[j] = 0.0;
       cc[j] = 0.0;
     }
-
-    let rms = 0;
 
     for (let i = 0; i != input.length; ++i) {
       let v = input[i];
 
       if (this.tapGenFreq) {
-        v = strobeGenSample(this.tapGenFreq);
+        v = strobeGenSample(this.tapGenFreq, this.tapGenFreq.gens[0]);
       }
 
-      rms += v * v;
+      this.rms += v * v;
 
       for (let j = 0; j != this.strobes.length; ++j) {
         const strobe = this.strobes[j];
-        strobeGenSample(strobe);
+        for (let k = 0; k != this.phaseCount; ++k) {
+          const gen = strobe.gens[k];
+          strobeGenSample(strobe, gen);
 
-        ss[j] += strobe.sin * v;
-        cc[j] += strobe.cos * v;
+          ss[j * this.phaseCount + k] += gen.sin * v;
+          cc[j * this.phaseCount + k] += gen.cos * v;
+        }
       }
     }
 
     rms = Math.sqrt(rms / input.length);
 
     for (let j = 0; j != this.strobes.length; ++j) {
-      ss[j] /= input.length;
-      cc[j] /= input.length;
+      let norms = 0.0;
+      let angle_diffs = 0.0;
 
-      let norm = Math.sqrt(ss[j] * ss[j] + cc[j] * cc[j]);
-      if (norm > 0) {
-        ss[j] /= norm;
-        cc[j] /= norm;
+      for (let k = 0; k != this.phaseCount; ++k) {
+        const ix = j * this.phaseCount + k;
+        ss[ix] /= input.length;
+        cc[ix] /= input.length;
+
+        let norm = Math.sqrt(ss[ix] * ss[ix] + cc[ix] * cc[ix]);
+        if (norm > 0) {
+          ss[ix] /= norm;
+          cc[ix] /= norm;
+        }
+        if (rms > 0)
+          norm /= rms;
+
+        const angle = Math.atan2(ss[ix], cc[ix]);
+
+        if (angle - this.strobes[j].angles[k] > Math.PI) {
+          this.strobes[j].angles[k] += 2 * Math.PI;
+        } else if (this.strobes[j].angles[k] - angle > Math.PI) {
+          this.strobes[j].angles[k] -= 2 * Math.PI;
+        }
+
+        const angle_diff = this.strobes[j].angles[k] - angle;
+        if (Math.abs(angle_diff) > Math.PI)
+          console.warn('internal error: angle_diff should be <= pi', angle_diff, angle, this.strobes[j].angles[k]);
+
+        this.strobes[j].angles[k] = angle;
+        norms += norm;
+        angle_diffs += angle_diff;
       }
-      if (rms > 0)
-        norm /= rms;
 
-      const angle = Math.atan2(cc[j], ss[j]);
-      if (angle - this.strobes[j].angle > Math.PI) {
-        this.strobes[j].angle += 2 * Math.PI;
-      } else if (this.strobes[j].angle - angle > Math.PI) {
-        this.strobes[j].angle -= 2 * Math.PI;
-      }
 
-      const angle_diff = angle - this.strobes[j].angle;
-      if (Math.abs(angle_diff) > Math.PI)
-        console.warn('internal error: angle_diff should be <= pi', angle_diff, angle, this.strobes[j].angle);
+      const norm = norms / this.phaseCount;
+      const angle_diff = angle_diffs / this.phaseCount;
 
       this.strobes[j].norm = this.strobes[j].norm * this.filterNorm + norm * (1.0 - this.filterNorm);
-      this.strobes[j].angle = angle;
 
       circularBufPush(this.buffers[j], angle_diff);
 
-      this.strobes[j].angle_diff = arrayMean(this.buffers[j].data);
+      const angle_diff_mean = arrayMean(this.buffers[j].data);
       this.strobes[j].angle_diff_variance = arrayStddev(this.buffers[j].data);
 
-      // TODO convert angular diff to cents
-      // this.strobes[j].angle_diff = this.strobes[j].angle_diff * this.filterAngle + angle_diff * (1.0 - this.filterAngle);
+      this.strobes[j].angle_diff = angle_diff_mean;
+      this.strobes[j].angle_diff_filtered = this.strobes[j].angle_diff_filtered * this.filterAngle + angle_diff_mean * (1.0 - this.filterAngle);
 
     }
 
+    // TODO nan
     this.rms = this.rms * this.filterRms + rms * (1.0 - this.filterRms);
 
     this.updateEvery--;

@@ -7,6 +7,7 @@ export type Options = {
 
 export type WorkletOptions = {
   updatePeriod: number;
+  bufferLength: number;
   filterNorm: number;
   filterRms: number;
   filterAngle: number;
@@ -28,12 +29,14 @@ export function makeOptions(
 }
 
 export function makeWorkletOptions(
-  updatePeriod: number = 1,
-  filterNorm: number = 0.9,
-  filterRms: number = 0.9,
-  filterAngle: number = 0.999
+  updatePeriod: number = 6, // 44100/(128*6) ~60Hz
+  bufferLength: number = 10, // store 2 full periods of lowest frequency
+  // bufferLength: number = 17, // ~20Hz, ~50ms window
+  filterNorm: number = 0.8,
+  filterRms: number = 0.8,
+  filterAngle: number = 0.5,
 ): WorkletOptions {
-  return { updatePeriod, filterNorm, filterRms, filterAngle };
+  return { updatePeriod, bufferLength, filterNorm, filterRms, filterAngle };
 }
 
 export function makeDisplayOptions(
@@ -50,6 +53,7 @@ export type Strobe = {
   angle_diff: number;
   norm: number;
   angle_diff_variance: number;
+  angle_diff_filtered: number;
 }
 
 export type WorkletResults = {
@@ -60,6 +64,7 @@ export type WorkletResults = {
 export type WorkletSetFreqs = {
   freqs: Array<number>;
   tapGenFreq?: number;
+  bufferLength?: number;
 }
 
 
@@ -99,7 +104,11 @@ export async function init(options: Options): Promise<T> {
 }
 
 export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tapGenFreq: number | null) {
-  t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq });
+  let updatePeriod = Math.ceil(44100 / freq / 128);
+  let bufferLength = Math.ceil(44100 / freq / 128) * t.options.worklet.bufferLength;
+  let filterAngle = 0.8; // Math.max(0.5, Math.min(0.95, 1 - (1 / (44100 / freq / 128))))
+  // let filterAngle = Math.max(1 - (1 / (44100 / freq / 128)));
+  t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq, bufferLength: bufferLength, filterAngle: filterAngle, updatePeriod: updatePeriod });
   t.stroberMessage = { strobes: [], rms: 0 };
 }
 
@@ -127,29 +136,38 @@ export function getAmplitudeOfBucket(t: T, bucket: number): number {
   return v;
 }
 
+export function centsOfStrobe(s: Strobe, filt: boolean) {
+  let a = filt ? s.angle_diff_filtered : s.angle_diff;
+  let v = a / s.freq;
+  // TODO fix this
+  let A = 1.03e5;
+  let B = -2478385.6177376145;
+  return A * v + B * v * v;
+}
 
 /**
 
-285 0    0.0002
-285 1    0.0025
-285 10   0.0275
-285 100  0.2840
-285 200  0.5850
-285 500  1.5993
-285 800  2.8058
+285 0    0.0002       7.0e-7
+285 1    0.0025       8.77e-6
+285 10   0.0275       9.65e-5
+285 100  0.2840       9.96e-4
+285 200  0.5850       2.05e-3
+285 500  1.5993       5.61e-3
+285 800  2.8058       9.84e-3
+285 880 overflow norm 0.45
 285 1000 -2.7     (overflow?)
 
-285 -1   -0.0028
-285 -10  -0.0275
+285 -1   -0.0028      -9.82e-6
+285 -10  -0.0275      -9.64e-5
 285 -100 -0.2680
 285 -200 -0.5210
 285 -500 -1.1980
 285 -800 -1.7670
 
-350  0    0.0001
+350  0    0.0001      2.8e-7
 350  1    0.0033
 350  10   0.0340
-350  100  0.3490
+350  100  0.3490      1e-3
 350  200  0.7183
 350  500  1.9640
 350  700  2.9230
@@ -166,7 +184,7 @@ export function getAmplitudeOfBucket(t: T, bucket: number): number {
 440  0    0.0001
 440  1    0.0043
 440  10   0.0426
-440  100  0.4386
+440  100  0.4386    9.96e-4
 440  200  0.9032
 440  500  2.4700
 440  700 -2 (overflow)
@@ -181,7 +199,7 @@ export function getAmplitudeOfBucket(t: T, bucket: number): number {
 1000  0    0.0001
 1000  1    0.0097
 1000  10   0.0973
-1000  100  0.9986
+1000  100  0.9986     9.98e-4
 1000  200  2.0569
 1000  300 -1 (overflow, norm 0.45)
 1000  350 -2.51 (overflow, norm 0.35)
