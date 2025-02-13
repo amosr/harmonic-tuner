@@ -46,7 +46,7 @@ function arrayMean(data) {
 }
 
 function arrayStddev(data) {
-  // xxx variance?
+  // xxx is this variance or stddev?
   const mean = arrayMean(data);
   let dev = 0.0;
   for (let i = 0; i != data.length; ++i) {
@@ -72,13 +72,12 @@ class StrobeProcessor extends AudioWorkletProcessor {
     this.phaseCount = options.processorOptions.phaseCount ?? 1;
 
     this.updateEvery = 0;
-    this.rms = 0.0;
     this.strobes = [];
 
     this.buffers = [];
     this.ss = [];
     this.cc = [];
-    this.rms = 0.0;
+    this.clear();
 
     this.port.onmessage = (e) => {
       const data = e.data;
@@ -88,10 +87,11 @@ class StrobeProcessor extends AudioWorkletProcessor {
         strobes.push(Strobe(f, this.sampleRate, this.phaseCount))
         buffers.push(CircularBuf(data.bufferLength));
       })
-      if (buffers[0])
-        console.log('circular buf', buffers[0].data.length);
       this.filterAngle = data.filterAngle ?? this.filterAngle;
       this.updatePeriod = data.updatePeriod ?? this.updatePeriod;
+
+      if (buffers[0])
+        console.log('circular buf', buffers[0].data.length, this.updatePeriod);
 
       this.strobes = strobes;
       this.buffers = buffers;
@@ -104,20 +104,35 @@ class StrobeProcessor extends AudioWorkletProcessor {
 
       this.ss = Array(this.strobes.length * this.phaseCount);
       this.cc = Array(this.strobes.length * this.phaseCount);
-      this.rms = 0.0;
+      this.clear();
     };
 
+  }
+
+  clear() {
+    this.updateEvery = this.updatePeriod;
+    this.rms = 0.0;
+    for (let j = 0; j != this.ss.length; ++j) {
+      this.ss[j] = 0.0;
+      this.cc[j] = 0.0;
+    }
+
+    if (isNaN(this.rmsFiltered)) 
+      this.rmsFiltered = 0.0;
+
+    for (let i = 0; i != this.strobes.length; ++i) {
+      const strobe = this.strobes[i];
+      if (isNaN(strobe.angle_diff_filtered))
+        strobe.angle_diff_filtered = strobe.angle_diff;
+      if (isNaN(strobe.norm))
+        strobe.norm = 0.0;
+    }
   }
 
   process(inputs, outputs, parameters) {
     const input = inputs[0][0];
     const ss = this.ss;
     const cc = this.cc;
-    for (let j = 0; j != ss.length; ++j) {
-      ss[j] = 0.0;
-      cc[j] = 0.0;
-    }
-
     for (let i = 0; i != input.length; ++i) {
       let v = input[i];
 
@@ -139,7 +154,15 @@ class StrobeProcessor extends AudioWorkletProcessor {
       }
     }
 
-    rms = Math.sqrt(rms / input.length);
+    this.updateEvery--;
+    if (this.updateEvery > 0) {
+      return true;
+    }
+
+    const rms = Math.sqrt(this.rms / (this.updatePeriod * input.length));
+
+
+    this.rmsFiltered = this.rmsFiltered * this.filterRms + rms * (1.0 - this.filterRms);
 
     for (let j = 0; j != this.strobes.length; ++j) {
       let norms = 0.0;
@@ -147,8 +170,8 @@ class StrobeProcessor extends AudioWorkletProcessor {
 
       for (let k = 0; k != this.phaseCount; ++k) {
         const ix = j * this.phaseCount + k;
-        ss[ix] /= input.length;
-        cc[ix] /= input.length;
+        ss[ix] /= this.updatePeriod * input.length;
+        cc[ix] /= this.updatePeriod * input.length;
 
         let norm = Math.sqrt(ss[ix] * ss[ix] + cc[ix] * cc[ix]);
         if (norm > 0) {
@@ -177,7 +200,7 @@ class StrobeProcessor extends AudioWorkletProcessor {
 
 
       const norm = norms / this.phaseCount;
-      const angle_diff = angle_diffs / this.phaseCount;
+      const angle_diff = angle_diffs / this.phaseCount / this.updatePeriod;
 
       this.strobes[j].norm = this.strobes[j].norm * this.filterNorm + norm * (1.0 - this.filterNorm);
 
@@ -191,14 +214,8 @@ class StrobeProcessor extends AudioWorkletProcessor {
 
     }
 
-    // TODO nan
-    this.rms = this.rms * this.filterRms + rms * (1.0 - this.filterRms);
-
-    this.updateEvery--;
-    if (this.updateEvery <= 0) {
-      this.updateEvery = this.updatePeriod;
-      this.port.postMessage({ strobes: this.strobes, rms: this.rms });
-    }
+    this.port.postMessage({ strobes: this.strobes, rms: rms });
+    this.clear();
 
     return true;
   }

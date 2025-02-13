@@ -2,8 +2,14 @@ import React from "react";
 
 import * as Tuner from "../tuner";
 
-function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>) {
+function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>, debug: boolean) {
   // ctx.clearRect(0, 0, canv.width, canv.height);
+
+  ctx.lineWidth = 1.0;
+  const fontSize = 12;
+  ctx.font = `${fontSize}px monospace`;
+  ctx.strokeStyle = 'rgb(255,255,255)';
+
 
   const count = t.bytes.length;
   const w_per_bucket = Tuner.getWOfBucket(t);
@@ -16,21 +22,41 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
     ctx.fillRect(x, 0, w_per_bucket, h);
   }
 
-  ctx.lineWidth = 1.0;
-  ctx.strokeStyle='rgb(255,255,255)';
-  ctx.beginPath();
-  ctx.moveTo(0, h/2);
-  ctx.lineTo(canv.width, h/2);
-  ctx.stroke();
-  ctx.closePath();
+  // ctx.beginPath();
+  // ctx.moveTo(0, h/2);
+  // ctx.lineTo(canv.width, h/2);
+  // ctx.stroke();
+  // ctx.closePath();
+
+  const yOfCents = (cents: number) =>
+      (h / 2) +
+      Math.sqrt(Math.abs(cents) / 500) * (h / 2)
+    * (cents >= 0 ? 1 : -1)
+
+  const centsGauge = [[0, 30], [1, 20], [5, 10], [10, 5], [50, 4], [100, 2]];
+
+  centsGauge.forEach(([c,w]) => {
+    if (c > 0) {
+      ctx.strokeText(`+${c}`, 0, yOfCents(c));
+      ctx.strokeText(`-${c}`, 0, yOfCents(-c));
+    } else {
+      ctx.strokeText(`${c}`, 0, yOfCents(c));
+    }
+  })
 
   for (let i = 0; i != strobes.length; ++i) {
     const strobe = strobes[i];
     const x = Tuner.getXOfFreq(t, strobe.freq);
 
     ctx.beginPath();
-    ctx.moveTo(x, h/2 - 10);
-    ctx.lineTo(x, h/2 + 10);
+    centsGauge.forEach(([c,w]) => {
+      ctx.moveTo(x - w, yOfCents(c));
+      ctx.lineTo(x + w, yOfCents(c));
+      ctx.moveTo(x - w, yOfCents(-c));
+      ctx.lineTo(x + w, yOfCents(-c));
+    })
+    // ctx.moveTo(x, h/2 - 10);
+    // ctx.lineTo(x, h/2 + 10);
     ctx.stroke();
 
     const n = strobe.norm;
@@ -49,15 +75,11 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
       (cents >  0) ? [0, 0, 255] :
                      [255, 0, 0];
 
-    const y = (h / 2) + (
-      (cents >= 0) ?
-        Math.sqrt(cents / 500) * (h / 2) :
-        -Math.sqrt(-cents / 500) * (h / 2)
-    );
+    const y = yOfCents(cents);
 
     // const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
     const w = n * 10;
-    const hh = h / 8;
+    const hh = Math.min(100, Math.max(1, strobe.angle_diff_variance * 100));
 
     if (display) {
       ctx.fillStyle = `rgb(${r},${g},${b})`;
@@ -83,16 +105,12 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
     //   setTextStatus(`[${mm.min.toFixed(4)},${mm.max.toFixed(4)}] (${mm.sum / mm.count}) ${txtReceptFreq.current?.value} ${txtGenFreq.current?.value}`);
 
 
-    ctx.lineWidth = 1.0;
-    const fontSize = 15;
-    ctx.font = `${fontSize}px monospace`;
-    ctx.strokeStyle = 'rgb(255,255,255)';
-
     if (display) {
       ctx.strokeText(`${centsNum > 0 ? '+' : ''}${centsNum.toFixed(0)} cents`, x + 1, h/2);
-      // ctx.strokeText(`${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
-      // ctx.strokeText(`${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
-      // ctx.strokeText(`${mm.min.toFixed(4)}:${mm.max.toFixed(4)}`, x + 1, h/2 + 25);
+    }
+    if (debug) {
+      ctx.strokeText(`rvar  ${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
+      ctx.strokeText(`rnorm ${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
     }
 
     ctx.strokeText(`${strobe.freq}`, x - (fontSize * 0.25 * (strobe.freq.toString().length)), h - fontSize);
@@ -103,6 +121,7 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
 export function Analysis() {
   const [trigger, setTrigger] = React.useState(false);
   const [textStatus, setTextStatus] = React.useState("");
+  const [debug, setDebug] = React.useState(false);
 
   const [t, setT] = React.useState<Tuner.T | null>(null);
   const canvas = React.createRef<HTMLCanvasElement>();
@@ -137,7 +156,7 @@ export function Analysis() {
         const strobes: Tuner.Strobe[] = [];
         for (let i = 0; i != msg.strobes.length; ++i) {
           let strobe = msg.strobes[i];
-          if (strobe.norm >= 0.50 && msg.rms > 0.001 && strobe.angle_diff_variance < 0.50) {
+          if (msg.rms > 0.001 && strobe.norm >= 0.50 && strobe.angle_diff_variance < 0.50 || debug) {
             last_strobes.current[i] = strobe;
           } else if (last_strobes.current[i]) {
             last_strobes.current[i].norm *= 0.95;
@@ -153,7 +172,7 @@ export function Analysis() {
           strobes.push(strobe);
         }
 
-        renderCanvas(t, canv, ctx, strobes);
+        renderCanvas(t, canv, ctx, strobes, debug);
       }
 
 
@@ -247,6 +266,7 @@ export function Analysis() {
   </p>
 
   <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /> (for testing accuracy, set to 1 to generate tone 1 cent sharp of receptive frequency)</label></p>
+  <p><label className="checkbox"><input type="checkbox" checked={debug} onChange={e => setDebug(e.target.checked)} /> debug</label></p>
   <p style={{fontFamily: "monospace"}}>{textStatus}</p>
   <canvas ref={canvas} width={document.body.clientWidth} height={600} />
   </>);

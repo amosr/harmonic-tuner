@@ -30,11 +30,11 @@ export function makeOptions(
 
 export function makeWorkletOptions(
   updatePeriod: number = 6, // 44100/(128*6) ~60Hz
-  bufferLength: number = 10, // store 2 full periods of lowest frequency
+  bufferLength: number = 5, // store 2 full periods of lowest frequency
   // bufferLength: number = 17, // ~20Hz, ~50ms window
   filterNorm: number = 0.8,
   filterRms: number = 0.8,
-  filterAngle: number = 0.5,
+  filterAngle: number = 0.8,
 ): WorkletOptions {
   return { updatePeriod, bufferLength, filterNorm, filterRms, filterAngle };
 }
@@ -105,8 +105,8 @@ export async function init(options: Options): Promise<T> {
 
 export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tapGenFreq: number | null) {
   let updatePeriod = Math.ceil(44100 / freq / 128);
-  let bufferLength = Math.ceil(44100 / freq / 128) * t.options.worklet.bufferLength;
-  let filterAngle = 0.8; // Math.max(0.5, Math.min(0.95, 1 - (1 / (44100 / freq / 128))))
+  let bufferLength = t.options.worklet.bufferLength;
+  let filterAngle = t.options.worklet.filterAngle; // Math.max(0.5, Math.min(0.95, 1 - (1 / (44100 / freq / 128))))
   // let filterAngle = Math.max(1 - (1 / (44100 / freq / 128)));
   t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq, bufferLength: bufferLength, filterAngle: filterAngle, updatePeriod: updatePeriod });
   t.stroberMessage = { strobes: [], rms: 0 };
