@@ -6,7 +6,8 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc"
+    "typecheck": "react-router typegen && tsc",
+    "upload": "npm run build  && tar cvzf build.tgz build/client && scp build.tgz songlark.net: && ssh songlark.net 'cd /var/www/songlark && rm -rvf tuner && tar xvzf ~/build.tgz && mv build/client tuner'"
   },
   "dependencies": {
     "@react-router/node": "^7.1.5",

@@ -82,7 +82,7 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
 
     // const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
     const w = n * 10;
-    const hh = Math.min(100, Math.max(1, strobe.angle_diff_variance * 100));
+    const hh = Math.min(100, Math.max(3, strobe.angle_diff_variance * 2000));
 
     if (display) {
       ctx.fillStyle = `rgb(${r},${g},${b})`;
@@ -151,6 +151,7 @@ export function Analysis() {
       const canv = canvas.current;
       const ctx = canv?.getContext('2d');
       if (canv && ctx) {
+        t.options.display.canvasWidth = canv.width;
         ctx.reset();
 
         const msg = t.stroberMessage;
@@ -159,7 +160,7 @@ export function Analysis() {
         const strobes: Tuner.Strobe[] = [];
         for (let i = 0; i != msg.strobes.length; ++i) {
           let strobe = msg.strobes[i];
-          if (msg.rms > 0.001 && strobe.norm >= 0.50 && strobe.angle_diff_variance < 0.50 || debug) {
+          if (msg.rms > 0.001 && strobe.norm >= 0.50 && strobe.angle_diff_variance < 0.10 || debug) {
             last_strobes.current[i] = strobe;
           } else if (last_strobes.current[i]) {
             last_strobes.current[i].norm *= 0.95;
@@ -253,24 +254,27 @@ export function Analysis() {
   }, [trigger]);
 
   return (<>
-  <p><a className="button is-primary" onClick={onConnect}>{ connecting ? "starting..." : t ? "stop processing" : "start processing" }</a></p>
-  {/* <p><a className="button is-primary" onClick={() => {minmaxs.current = [];}}>reset minmax</a></p> */}
-  <p><label className="text"><input type="number" className="text" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate(harmonics)} /> (the frequency you are interested in)</label></p>
-  <p>harmonics
-    {harmonics.map((en,ix) =>
-      <label className="checkbox" key={ix}>
-            <input type="checkbox" value={ix} checked={en} onChange={e => {
-              let hh = harmonics.map((x,i) => (i == ix) ? e.target.checked : x);
-              setHarmonics(hh);
-              onUpdate(hh);
-            }} /> {ix}
-        </label>
-    )}
-  </p>
+    <div className="overlay">
+      <p><a className="button is-primary" onClick={onConnect}>{ connecting ? "starting..." : t ? "stop processing" : "start processing" }</a></p>
+      {/* <p><a className="button is-primary" onClick={() => {minmaxs.current = [];}}>reset minmax</a></p> */}
+      <p><label className="text"><input type="number" className="text" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate(harmonics)} /> (the frequency you are interested in)</label></p>
+      <p>harmonics
+        {harmonics.map((en,ix) =>
+          <label className="checkbox" key={ix}>
+                <input type="checkbox" value={ix} checked={en} onChange={e => {
+                  let hh = harmonics.map((x,i) => (i == ix) ? e.target.checked : x);
+                  setHarmonics(hh);
+                  onUpdate(hh);
+                }} /> {ix}
+            </label>
+        )}
+      </p>
 
-  <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /> (for testing accuracy, set to 1 to generate tone 1 cent sharp of receptive frequency)</label></p>
-  <p><label className="checkbox"><input type="checkbox" checked={debug} onChange={e => setDebug(e.target.checked)} /> debug</label></p>
-  <p style={{fontFamily: "monospace"}}>{textStatus}</p>
-  <canvas ref={canvas} width={document.body.clientWidth} height={600} />
+      <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /> (for testing accuracy, set to 1 to generate tone 1 cent sharp of receptive frequency)</label></p>
+      <p><label className="checkbox"><input type="checkbox" checked={debug} onChange={e => setDebug(e.target.checked)} /> debug</label></p>
+      <p style={{fontFamily: "monospace"}}>{textStatus}</p>
+    </div>
+
+    <canvas className="main-display" ref={canvas} width={window.innerWidth} height={window.innerHeight} />
   </>);
 }

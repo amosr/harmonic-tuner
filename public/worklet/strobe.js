@@ -46,16 +46,14 @@ function arrayMean(data) {
 }
 
 function arrayStddev(data) {
-  // xxx is this variance or stddev?
   const mean = arrayMean(data);
   let dev = 0.0;
   for (let i = 0; i != data.length; ++i) {
     const v = data[i] - mean;
-    dev += Math.abs(v);
-    // dev += v * v;
+    dev += v * v;
   }
-  return dev / data.length;
-  // return Math.sqrt(dev / data.length);
+  // return dev / data.length;
+  return Math.sqrt(dev / data.length);
 }
 
 class StrobeProcessor extends AudioWorkletProcessor {
