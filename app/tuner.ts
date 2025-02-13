@@ -110,6 +110,11 @@ export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tap
   // let filterAngle = Math.max(1 - (1 / (44100 / freq / 128)));
   t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq, bufferLength: bufferLength, filterAngle: filterAngle, updatePeriod: updatePeriod });
   t.stroberMessage = { strobes: [], rms: 0 };
+
+  if (harmonics.length) {
+    t.options.display.minFreq = freq * harmonics[0] * 0;
+    t.options.display.maxFreq = freq * harmonics[harmonics.length - 1] * 1.3;
+  }
 }
 
 export function getXOfFreq(t: T, freq: number): number {

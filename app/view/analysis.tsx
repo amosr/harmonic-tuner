@@ -35,12 +35,15 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
 
   const centsGauge = [[0, 30], [1, 20], [5, 10], [10, 5], [50, 4], [100, 2]];
 
+  const padLeft = (s: string, len: number) =>
+    (" ".repeat(len - s.length)) + s;
+
   centsGauge.forEach(([c,w]) => {
     if (c > 0) {
-      ctx.strokeText(`+${c}`, 0, yOfCents(c));
-      ctx.strokeText(`-${c}`, 0, yOfCents(-c));
+      ctx.strokeText(padLeft(`+${c}`, 4), 0, yOfCents(c));
+      ctx.strokeText(padLeft(`-${c}`, 4), 0, yOfCents(-c));
     } else {
-      ctx.strokeText(`${c}`, 0, yOfCents(c));
+      ctx.strokeText(padLeft(`${c}`, 4), 0, yOfCents(c));
     }
   })
 
@@ -109,8 +112,8 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
       ctx.strokeText(`${centsNum > 0 ? '+' : ''}${centsNum.toFixed(0)} cents`, x + 1, h/2);
     }
     if (debug) {
-      ctx.strokeText(`rvar  ${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
-      ctx.strokeText(`rnorm ${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
+      ctx.strokeText(`recept var  ${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
+      ctx.strokeText(`recept norm ${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
     }
 
     ctx.strokeText(`${strobe.freq}`, x - (fontSize * 0.25 * (strobe.freq.toString().length)), h - fontSize);
