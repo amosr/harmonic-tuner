@@ -11,6 +11,7 @@ export type WorkletOptions = {
   filterNorm: number;
   filterRms: number;
   filterAngle: number;
+  clipLimit: number;
 }
 
 export type DisplayOptions = {
@@ -35,8 +36,9 @@ export function makeWorkletOptions(
   filterNorm: number = 0.8,
   filterRms: number = 0.8,
   filterAngle: number = 0.8,
+  clipLimit: number = 0.001,
 ): WorkletOptions {
-  return { updatePeriod, bufferLength, filterNorm, filterRms, filterAngle };
+  return { updatePeriod, bufferLength, filterNorm, filterRms, filterAngle, clipLimit };
 }
 
 export function makeDisplayOptions(
@@ -75,12 +77,15 @@ export type T = {
   bytes: Uint8Array;
   strober: AudioWorkletNode;
   stroberMessage: WorkletResults;
+  centreClip: AudioWorkletNode;
   options: Options;
 };
 
 export async function init(options: Options): Promise<T> {
   const audio = new AudioContext();
   await audio.audioWorklet.addModule("worklet/strobe.js");
+  await audio.audioWorklet.addModule("worklet/centre-clip.js");
+
   const media = await navigator.mediaDevices.getUserMedia({audio: true});
   const source = audio.createMediaStreamSource(media);
   const analyser = audio.createAnalyser();
@@ -91,11 +96,14 @@ export async function init(options: Options): Promise<T> {
 
   const bytes = new Uint8Array(analyser.frequencyBinCount);
 
+  const centreClip = new AudioWorkletNode(audio, "centre-clip-processor", { processorOptions: { limit: options.worklet.clipLimit } });
   const strober = new AudioWorkletNode(audio, "strobe-processor", { processorOptions: { sampleRate: audio.sampleRate, ...options.worklet } });
-  source.connect(strober);
+
+  source.connect(centreClip);
+  centreClip.connect(strober);
 
   const stroberMessage = { strobes: [], rms: 0 };
-  const result = { audio, analyser, media, bytes, strober, stroberMessage, options };
+  const result = { audio, analyser, media, bytes, strober, stroberMessage, centreClip, options };
   strober.port.onmessage = (e) => {
     result.stroberMessage = e.data;
   };
@@ -104,11 +112,10 @@ export async function init(options: Options): Promise<T> {
 }
 
 export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tapGenFreq: number | null) {
+  let opt = t.options.worklet;
   let updatePeriod = Math.ceil(44100 / freq / 128 * 2); // at least two periods of lowest frequency
-  let bufferLength = t.options.worklet.bufferLength;
-  let filterAngle = t.options.worklet.filterAngle; // Math.max(0.5, Math.min(0.95, 1 - (1 / (44100 / freq / 128))))
-  // let filterAngle = Math.max(1 - (1 / (44100 / freq / 128)));
-  t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq, bufferLength: bufferLength, filterAngle: filterAngle, updatePeriod: updatePeriod });
+  t.centreClip.port.postMessage({ ...opt });
+  t.strober.port.postMessage({ freqs: harmonics.map(h => h * freq), tapGenFreq: tapGenFreq, ...opt, updatePeriod: updatePeriod });
   t.stroberMessage = { strobes: [], rms: 0 };
 
   if (harmonics.length) {
@@ -144,7 +151,7 @@ export function getAmplitudeOfBucket(t: T, bucket: number): number {
 export function centsOfStrobe(s: Strobe, filt: boolean) {
   let a = filt ? s.angle_diff_filtered : s.angle_diff;
   let v = a / s.freq;
-  // TODO fix this
+  // TODO fix this - slightly different for negatives than positive
   let A = 1.03e5;
   let B = -2478385.6177376145;
   return A * v + B * v * v;

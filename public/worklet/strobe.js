@@ -1,3 +1,7 @@
+/**
+ * Bounded pitch detection with phase-locked loops / phase vocoder
+ */
+
 function Osc(phase) {
   return { sin: Math.sin(phase), cos: Math.cos(phase) };
 }
