@@ -104,7 +104,7 @@ export async function init(options: Options): Promise<T> {
 }
 
 export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tapGenFreq: number | null) {
-  let updatePeriod = Math.ceil(44100 / freq / 128);
+  let updatePeriod = Math.ceil(44100 / freq / 128 * 2); // at least two periods of lowest frequency
   let bufferLength = t.options.worklet.bufferLength;
   let filterAngle = t.options.worklet.filterAngle; // Math.max(0.5, Math.min(0.95, 1 - (1 / (44100 / freq / 128))))
   // let filterAngle = Math.max(1 - (1 / (44100 / freq / 128)));

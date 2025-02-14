@@ -45,15 +45,14 @@ function arrayMean(data) {
   return sum / data.length;
 }
 
-function arrayStddev(data) {
+function arrayVariance(data) {
   const mean = arrayMean(data);
   let dev = 0.0;
   for (let i = 0; i != data.length; ++i) {
     const v = data[i] - mean;
     dev += v * v;
   }
-  // return dev / data.length;
-  return Math.sqrt(dev / data.length);
+  return dev / data.length;
 }
 
 class StrobeProcessor extends AudioWorkletProcessor {
@@ -144,6 +143,8 @@ class StrobeProcessor extends AudioWorkletProcessor {
         const strobe = this.strobes[j];
         for (let k = 0; k != this.phaseCount; ++k) {
           const gen = strobe.gens[k];
+          // phase-locked loop
+          // oscGenSample(gen, strobe.f * (1 + strobe.angle_diff * 0.1));
           strobeGenSample(strobe, gen);
 
           ss[j * this.phaseCount + k] += gen.sin * v;
@@ -187,6 +188,7 @@ class StrobeProcessor extends AudioWorkletProcessor {
           this.strobes[j].angles[k] -= 2 * Math.PI;
         }
 
+        // const angle_diff = angle0 - angle;
         const angle_diff = this.strobes[j].angles[k] - angle;
         if (Math.abs(angle_diff) > Math.PI)
           console.warn('internal error: angle_diff should be <= pi', angle_diff, angle, this.strobes[j].angles[k]);
@@ -205,7 +207,7 @@ class StrobeProcessor extends AudioWorkletProcessor {
       circularBufPush(this.buffers[j], angle_diff);
 
       const angle_diff_mean = arrayMean(this.buffers[j].data);
-      this.strobes[j].angle_diff_variance = arrayStddev(this.buffers[j].data);
+      this.strobes[j].angle_diff_variance = arrayVariance(this.buffers[j].data);
 
       this.strobes[j].angle_diff = angle_diff_mean;
       this.strobes[j].angle_diff_filtered = this.strobes[j].angle_diff_filtered * this.filterAngle + angle_diff_mean * (1.0 - this.filterAngle);
