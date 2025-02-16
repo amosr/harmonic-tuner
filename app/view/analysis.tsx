@@ -3,30 +3,24 @@ import React from "react";
 import * as Tuner from "../tuner";
 
 function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>, debug: boolean) {
-  // ctx.clearRect(0, 0, canv.width, canv.height);
+  ctx.reset();
 
   ctx.lineWidth = 1.0;
   const fontSize = 12;
   ctx.font = `${fontSize}px monospace`;
   ctx.strokeStyle = 'rgb(255,255,255)';
 
-
   const count = t.bytes.length;
   const w_per_bucket = Tuner.getWOfBucket(t);
   const h = canv.height;
 
+  // show fft behind gauges
   for (let i = 0; i != count; ++i) {
     const x = Tuner.getXOfBucket(t, i);
     const v = Tuner.getAmplitudeOfBucket(t, i);
     ctx.fillStyle = `rgb(${v / 8}, ${v / 2}, ${v / 8})`;
     ctx.fillRect(x, 0, w_per_bucket, h);
   }
-
-  // ctx.beginPath();
-  // ctx.moveTo(0, h/2);
-  // ctx.lineTo(canv.width, h/2);
-  // ctx.stroke();
-  // ctx.closePath();
 
   const yOfCents = (cents: number) =>
       (h / 2) +
@@ -58,16 +52,10 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
       ctx.moveTo(x - w, yOfCents(-c));
       ctx.lineTo(x + w, yOfCents(-c));
     })
-    // ctx.moveTo(x, h/2 - 10);
-    // ctx.lineTo(x, h/2 + 10);
     ctx.stroke();
 
     const n = strobe.norm;
-    // noisy, for position?
-    // const cents = Tuner.centsOfStrobe(strobe, false);
     const cents = Tuner.centsOfStrobe(strobe, true);
-    // less noisy for text
-    const centsNum = Tuner.centsOfStrobe(strobe, true);
     const vv = strobe.angle_diff_variance;
 
     const display = n > 0;
@@ -79,38 +67,16 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
                      [255, 0, 0];
 
     const y = yOfCents(cents);
-
-    // const y = Math.min(h, Math.max(0, (h / 2) + (strobe.angle_diff * h)));
     const w = n * 10;
     const hh = Math.min(100, Math.max(3, strobe.angle_diff_variance * 2000));
 
     if (display) {
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x - w/2, y - hh/2, w, hh);
+
+      ctx.strokeText(`${cents > 0 ? '+' : ''}${cents.toFixed(0)} cents`, x + 1, h/2);
     }
 
-    // let mm = minmaxs.current[i];
-    // if (!mm) {
-    //   mm = minmaxs.current[i] = { min: strobe.angle_diff, max: strobe.angle_diff, count: 0, sum: 0.0 };
-    // }
-    // mm.count++;
-    // mm.sum += strobe.angle_diff;
-    // if (strobe.angle_diff < mm.min)
-    //   mm.min = strobe.angle_diff;
-    // if (strobe.angle_diff > mm.max)
-    //   mm.max = strobe.angle_diff;
-
-
-
-
-
-    // if (i == 0)
-    //   setTextStatus(`[${mm.min.toFixed(4)},${mm.max.toFixed(4)}] (${mm.sum / mm.count}) ${txtReceptFreq.current?.value} ${txtGenFreq.current?.value}`);
-
-
-    if (display) {
-      ctx.strokeText(`${centsNum > 0 ? '+' : ''}${centsNum.toFixed(0)} cents`, x + 1, h/2);
-    }
     if (debug) {
       ctx.strokeText(`recept var  ${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
       ctx.strokeText(`recept norm ${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
@@ -135,16 +101,10 @@ export function Analysis() {
 
   const [harmonics, setHarmonics] = React.useState<boolean[]>([false,true, false, false, true, false, false, false, false, false, true])
 
-  // let minmaxs = React.useRef<({min:number,max:number,count:number,sum:number}|null)[]>([]);
-
   const updateEvery = React.useRef(0);
   const onRefresh = () => {
     if (t) {
       setTrigger(!trigger);
-      // updateEvery.current--;
-      // if (updateEvery.current > 0)
-      //   return;
-      // updateEvery.current = 3;
 
       Tuner.loadFrequencyData(t);
 
@@ -152,7 +112,6 @@ export function Analysis() {
       const ctx = canv?.getContext('2d');
       if (canv && ctx) {
         t.options.display.canvasWidth = canv.width;
-        ctx.reset();
 
         const msg = t.stroberMessage;
         setTextStatus(`rms ${msg.rms.toFixed(3)}`);
@@ -188,7 +147,6 @@ export function Analysis() {
   const [connecting, setConnecting] = React.useState(false);
 
   const onUpdate = async (harmonics: boolean[]) => {
-    // console.log(t, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
     let tt = t;
     if (!tt) {
       if (connecting)
@@ -198,12 +156,9 @@ export function Analysis() {
       if (canvas.current?.width)
         opt.display.canvasWidth = canvas.current?.width;
       tt = await Tuner.init(opt);
-      // console.log(opt);
-      // console.log('done', t, tt, txtReceptFreq.current?.value, txtGenFreq.current?.value, harmonics, connecting)
       setT(tt);
       return;
     }
-    // console.log(tt)
 
     let receptFreq = null;
     let receptFreqTxt = txtReceptFreq.current?.value;
@@ -216,7 +171,6 @@ export function Analysis() {
     if (receptFreq && genFreqTxt) {
       const cents = parseFloat(genFreqTxt);
       genFreq = receptFreq * Math.pow(Math.pow(2, 1/1200), cents);
-      // console.log(receptFreq, cents, genFreq)
     }
 
     if (receptFreq) {
@@ -227,7 +181,6 @@ export function Analysis() {
       Tuner.setStrobeFreqs(tt, receptFreq, harm_en, genFreq);
     }
     last_strobes.current = [];
-    // minmaxs.current = [];
 
     setTrigger(!trigger);
   };
@@ -241,8 +194,7 @@ export function Analysis() {
 
   const onConnect = async () => {
     if (t) {
-      t.audio.close();
-      t.media.getTracks().forEach(x => x.stop());
+      Tuner.close(t);
       setT(null);
     } else {
       onUpdate(harmonics);
@@ -256,7 +208,6 @@ export function Analysis() {
   return (<>
     <div className="overlay">
       <p><a className="button is-primary" onClick={onConnect}>{ connecting ? "starting..." : t ? "stop processing" : "start processing" }</a></p>
-      {/* <p><a className="button is-primary" onClick={() => {minmaxs.current = [];}}>reset minmax</a></p> */}
       <p><label className="text"><input type="number" className="text" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate(harmonics)} /> (the frequency you are interested in)</label></p>
       <p>harmonics
         {harmonics.map((en,ix) =>

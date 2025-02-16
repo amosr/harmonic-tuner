@@ -79,6 +79,7 @@ export type T = {
   stroberMessage: WorkletResults;
   centreClip: AudioWorkletNode;
   options: Options;
+  wakeLock: WakeLockSentinel | null;
 };
 
 export async function init(options: Options): Promise<T> {
@@ -103,12 +104,23 @@ export async function init(options: Options): Promise<T> {
   centreClip.connect(strober);
 
   const stroberMessage = { strobes: [], rms: 0 };
-  const result = { audio, analyser, media, bytes, strober, stroberMessage, centreClip, options };
+  const result: T = { audio, analyser, media, bytes, strober, stroberMessage, centreClip, options, wakeLock: null };
   strober.port.onmessage = (e) => {
     result.stroberMessage = e.data;
   };
 
+  // TODO: re-request lock on visibility change? https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API#reacquiring_a_wake_lock
+  navigator.wakeLock.request().then(w => {
+    result.wakeLock = w;
+  })
+
   return result;
+}
+
+export function close(t: T): void {
+  t.audio.close();
+  t.media.getTracks().forEach(x => x.stop());
+  t.wakeLock?.release();
 }
 
 export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tapGenFreq: number | null) {
@@ -119,7 +131,7 @@ export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tap
   t.stroberMessage = { strobes: [], rms: 0 };
 
   if (harmonics.length) {
-    t.options.display.minFreq = freq * harmonics[0] * 0;
+    t.options.display.minFreq = 0;
     t.options.display.maxFreq = freq * harmonics[harmonics.length - 1] * 1.3;
   }
 }
