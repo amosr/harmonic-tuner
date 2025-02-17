@@ -16,6 +16,9 @@
   --bulma-danger-s: 50%;
 }
 
+$tuner-font-size: 24px;
+$tuner-font-size-sml: 20px;
+
 
 
 // Load Bulma's base styles and themes (including the minireset)
@@ -44,4 +47,71 @@
 .overlay {
   position: relative;
   z-index: 100;
+  font-size: $tuner-font-size;
+}
+
+.harmonics .button {
+  @extend .is-large;
+  width: 12em;
+}
+
+.harmonics .button .current {
+  width: 100%;
+  text-align: right;
+}
+
+.harmonics .dropdown-menu {
+  width: 100%;
+}
+
+.harmonics label {
+  @extend .dropdown-item;
+  @extend .checkbox;
+  width: 100%;
+  font-size: $tuner-font-size-sml;
+}
+
+.harmonics label:hover {
+  @extend a, .dropdown-item, :hover;
+  // @extend a, .dropdown-item, .is-active;
+  font-size: $tuner-font-size-sml;
+}
+
+.harmonics label input {
+  width: 18px;
+  height: 18px;
+  // padding: 8px;
+  margin-top: 10px;
+  // float: right;
+}
+
+.status-row {
+  position: fixed;
+  bottom: 0px;
+  width: 100%;
+  z-index: -1;
+}
+
+.status-text {
+  // @include .column .is-8;
+  @extend .column;
+  @extend .is-8;
+  font-family: monospace;
+}
+.status-text p {
+  padding: 24px 12px;
+}
+
+.status-connect {
+  @extend .column;
+}
+
+.status-connect .button {
+  @extend .is-primary;
+  @extend .is-large;
+  float: right;
+}
+
+.status-connect .is-connected {
+  @extend .is-success;
 }

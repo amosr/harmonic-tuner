@@ -1,18 +1,22 @@
 import React from "react";
 
 import * as Tuner from "../tuner";
+import { Harmonics } from "./harmonics";
 
 function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>, debug: boolean) {
   ctx.reset();
 
   ctx.lineWidth = 1.0;
-  const fontSize = 12;
+  const fontSize = 18; // 24;
+  const fontXOffset = fontSize / 3.5;
+  const fontYOffset = fontSize / 3;
   ctx.font = `${fontSize}px monospace`;
   ctx.strokeStyle = 'rgb(255,255,255)';
 
   const count = t.bytes.length;
   const w_per_bucket = Tuner.getWOfBucket(t);
   const h = canv.height;
+  const maxCentDisplay = 400;
 
   // show fft behind gauges
   for (let i = 0; i != count; ++i) {
@@ -24,7 +28,7 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
 
   const yOfCents = (cents: number) =>
       (h / 2) +
-      Math.sqrt(Math.abs(cents) / 500) * (h / 2)
+      Math.sqrt(Math.abs(cents) / maxCentDisplay) * (h / 2)
     * (cents >= 0 ? 1 : -1)
 
   const centsGauge = [[0, 30], [1, 20], [5, 10], [10, 5], [50, 4], [100, 2]];
@@ -32,12 +36,17 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
   const padLeft = (s: string, len: number) =>
     (" ".repeat(len - s.length)) + s;
 
+  const drawText = (s: string, x: number, y: number) => {
+    ctx.fillStyle = 'rgb(192,192,192)';
+    ctx.fillText(s, x, y);
+  };
+
   centsGauge.forEach(([c,w]) => {
     if (c > 0) {
-      ctx.strokeText(padLeft(`+${c}`, 4), 0, yOfCents(c));
-      ctx.strokeText(padLeft(`-${c}`, 4), 0, yOfCents(-c));
+      drawText(padLeft(`+${c}`, 4), 0, yOfCents(c) + fontYOffset);
+      drawText(padLeft(`-${c}`, 4), 0, yOfCents(-c) + fontYOffset);
     } else {
-      ctx.strokeText(padLeft(`${c}`, 4), 0, yOfCents(c));
+      drawText(padLeft(`${c}`, 4), 0, yOfCents(c) + fontYOffset);
     }
   })
 
@@ -74,15 +83,18 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(x - w/2, y - hh/2, w, hh);
 
-      ctx.strokeText(`${cents > 0 ? '+' : ''}${cents.toFixed(0)} cents`, x + 1, h/2);
+      drawText(`${cents > 0 ? '+' : ''}${cents.toFixed(0)} cents`, x + 1, h/2);
     }
 
     if (debug) {
-      ctx.strokeText(`recept var  ${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
-      ctx.strokeText(`recept norm ${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
+      drawText(`recept var  ${strobe.angle_diff_variance.toFixed(4)}`, x + 1, h/2 + 25);
+      drawText(`recept norm ${strobe.norm.toFixed(4)}`, x + 1, h/2 + 50);
     }
 
-    ctx.strokeText(`${strobe.freq}`, x - (fontSize * 0.25 * (strobe.freq.toString().length)), h - fontSize);
+    {
+      const txt = `${strobe.freq}Hz`;
+      drawText(txt, x - (fontXOffset * (txt.length)), h - fontSize - 80);
+    }
   }
 
 }
@@ -99,7 +111,7 @@ export function Analysis() {
 
   const last_strobes = React.useRef<Array<Tuner.Strobe>>([]);
 
-  const [harmonics, setHarmonics] = React.useState<boolean[]>([false,true, false, false, true, false, false, false, false, false, true])
+  const [harmonics, setHarmonics] = React.useState<number[]>([1, 4, 10]);
 
   const updateEvery = React.useRef(0);
   const onRefresh = () => {
@@ -146,7 +158,7 @@ export function Analysis() {
 
   const [connecting, setConnecting] = React.useState(false);
 
-  const onUpdate = async (harmonics: boolean[]) => {
+  const onUpdate = async (harmonics: number[]) => {
     let tt = t;
     if (!tt) {
       if (connecting)
@@ -174,11 +186,7 @@ export function Analysis() {
     }
 
     if (receptFreq) {
-      const harm_en: number[] = [];
-      harmonics.forEach((en,ix) => {
-        if (en) harm_en.push(ix);
-      });
-      Tuner.setStrobeFreqs(tt, receptFreq, harm_en, genFreq);
+      Tuner.setStrobeFreqs(tt, receptFreq, harmonics, genFreq);
     }
     last_strobes.current = [];
 
@@ -207,23 +215,48 @@ export function Analysis() {
 
   return (<>
     <div className="overlay">
-      <p><a className="button is-primary" onClick={onConnect}>{ connecting ? "starting..." : t ? "stop processing" : "start processing" }</a></p>
-      <p><label className="text"><input type="number" className="text" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate(harmonics)} /> (the frequency you are interested in)</label></p>
-      <p>harmonics
-        {harmonics.map((en,ix) =>
-          <label className="checkbox" key={ix}>
-                <input type="checkbox" value={ix} checked={en} onChange={e => {
-                  let hh = harmonics.map((x,i) => (i == ix) ? e.target.checked : x);
-                  setHarmonics(hh);
-                  onUpdate(hh);
-                }} /> {ix}
-            </label>
-        )}
-      </p>
+      <div className="field is-grouped">
+        <div className="control has-icons-left is-expanded">
+          <input type="number" min="10" max="5000" className="input is-large" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate(harmonics)} />
+          <span className="icon is-left">
+            <i className="fas fa-solid fa-music"></i>
+          </span>
+        </div>
+        <Harmonics harmonics={harmonics} setHarmonics={h => {
+          setHarmonics(h);
+          onUpdate(h);
+        }} />
+        <div className="control settings">
+          <a className="button is-large">
+            <span className="icon">
+              <i className="fas fa-solid fa-sliders"></i>
+            </span>
+            <span>
+              settings
+            </span>
+          </a>
+        </div>
+      </div>
 
-      <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /> (for testing accuracy, set to 1 to generate tone 1 cent sharp of receptive frequency)</label></p>
+      <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /></label></p>
       <p><label className="checkbox"><input type="checkbox" checked={debug} onChange={e => setDebug(e.target.checked)} /> debug</label></p>
-      <p style={{fontFamily: "monospace"}}>{textStatus}</p>
+      <div className="status-row">
+        <div className="columns">
+          <div className="status-text">
+            <p>{t ? textStatus : "-"}</p>
+          </div>
+        <div className="status-connect">
+          <a className={"button" + (connecting ? " is-loading": "") + (t ? " is-connected" : "")} onClick={onConnect}>
+            <span className="icon">
+              <i className={"fas fa-solid" + (t ? " fa-microphone" : " fa-microphone-slash")}></i>
+            </span>
+            <span>
+              { t ? "connected" : "disconnected" }
+            </span>
+          </a>
+        </div>
+        </div>
+      </div>
     </div>
 
     <canvas className="main-display" ref={canvas} width={window.innerWidth} height={window.innerHeight} />
