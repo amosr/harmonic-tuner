@@ -91,8 +91,8 @@ export async function init(options: Options): Promise<T> {
   const source = audio.createMediaStreamSource(media);
   const analyser = audio.createAnalyser();
 
-  analyser.fftSize = options.fftSize ?? 4096;
-  analyser.smoothingTimeConstant = options.fftSmoothing ?? 0.8;
+  analyser.fftSize = options.fftSize;
+  analyser.smoothingTimeConstant = options.fftSmoothing;
   source.connect(analyser);
 
   const bytes = new Uint8Array(analyser.frequencyBinCount);
@@ -134,6 +134,9 @@ export function setStrobeFreqs(t: T, freq: number, harmonics: Array<number>, tap
     t.options.display.minFreq = 0;
     t.options.display.maxFreq = freq * harmonics[harmonics.length - 1] * 1.3;
   }
+
+  t.analyser.smoothingTimeConstant = t.options.fftSmoothing;
+  t.analyser.fftSize = t.options.fftSize;
 }
 
 export function getXOfFreq(t: T, freq: number): number {

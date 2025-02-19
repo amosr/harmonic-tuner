@@ -16,14 +16,12 @@ export function Harmonics({harmonics, setHarmonics}: Props) {
 
   let editor = <>
     {choices.map(h =>
-      // <div className="dropdown-item">
-        <label className="dropdown-item" key={h}>
-              <input type="checkbox" checked={harmonics.includes(h)} onChange={e => {
-                let hh = choices.filter(hx => (h == hx) ? e.target.checked : harmonics.includes(hx));
-                setHarmonics(hh);
-              }} /> {h}
-          </label>
-        // </div>
+      <label className="dropdown-item" key={h}>
+            <input type="checkbox" checked={harmonics.includes(h)} onChange={e => {
+              let hh = choices.filter(hx => (h == hx) ? e.target.checked : harmonics.includes(hx));
+              setHarmonics(hh);
+            }} /> {h}
+        </label>
     )}
     </>;
 

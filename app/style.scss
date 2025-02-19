@@ -85,6 +85,19 @@ $tuner-font-size-sml: 20px;
   // float: right;
 }
 
+.settings .button {
+  @extend .is-large;
+  // width: 7em;
+}
+
+.settings .dropdown-menu {
+  width: 37em;
+  left: -27em;
+  // right: 200px;
+  // float: right;
+  // position: fixed;
+}
+
 .status-row {
   position: fixed;
   bottom: 0px;

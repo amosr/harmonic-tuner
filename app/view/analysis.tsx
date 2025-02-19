@@ -2,6 +2,7 @@ import React from "react";
 
 import * as Tuner from "../tuner";
 import { Harmonics } from "./harmonics";
+import * as Options from "./options";
 
 function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, strobes: Array<Tuner.Strobe>, debug: boolean) {
   ctx.reset();
@@ -100,20 +101,20 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
 }
 
 export function Analysis() {
-  const [trigger, setTrigger] = React.useState(false);
   const [textStatus, setTextStatus] = React.useState("");
-  const [debug, setDebug] = React.useState(false);
 
   const [t, setT] = React.useState<Tuner.T | null>(null);
   const canvas = React.createRef<HTMLCanvasElement>();
-  const txtGenFreq = React.createRef<HTMLInputElement>();
   const txtReceptFreq = React.createRef<HTMLInputElement>();
+
+  const [options, setOptions] = React.useState(Options.defaultOptions);
 
   const last_strobes = React.useRef<Array<Tuner.Strobe>>([]);
 
   const [harmonics, setHarmonics] = React.useState<number[]>([1, 4, 10]);
+  const [connecting, setConnecting] = React.useState(false);
+  const [trigger, setTrigger] = React.useState(false);
 
-  const updateEvery = React.useRef(0);
   const onRefresh = () => {
     if (t) {
       setTrigger(!trigger);
@@ -131,7 +132,7 @@ export function Analysis() {
         const strobes: Tuner.Strobe[] = [];
         for (let i = 0; i != msg.strobes.length; ++i) {
           let strobe = msg.strobes[i];
-          if (msg.rms > 0.001 && strobe.norm >= 0.50 && strobe.angle_diff_variance < 0.10 || debug) {
+          if (msg.rms > 0.001 && strobe.norm >= 0.50 && strobe.angle_diff_variance < 0.10 || options.debugEnableDisplay) {
             last_strobes.current[i] = strobe;
           } else if (last_strobes.current[i]) {
             last_strobes.current[i].norm *= 0.95;
@@ -147,24 +148,18 @@ export function Analysis() {
           strobes.push(strobe);
         }
 
-        renderCanvas(t, canv, ctx, strobes, debug);
+        renderCanvas(t, canv, ctx, strobes, options.debugEnableDisplay);
       }
-
-
-
     }
-
   };
 
-  const [connecting, setConnecting] = React.useState(false);
-
-  const onUpdate = async (harmonics: number[]) => {
+  const onUpdate = async () => {
     let tt = t;
+    const opt = Options.makeOptions(options);
     if (!tt) {
       if (connecting)
         return;
       setConnecting(true);
-      const opt = Tuner.makeOptions();
       if (canvas.current?.width)
         opt.display.canvasWidth = canvas.current?.width;
       tt = await Tuner.init(opt);
@@ -172,21 +167,21 @@ export function Analysis() {
       return;
     }
 
+    tt.options = opt;
+
     let receptFreq = null;
     let receptFreqTxt = txtReceptFreq.current?.value;
     if (receptFreqTxt) {
       receptFreq = parseFloat(receptFreqTxt);
     }
 
-    let genFreq = null;
-    let genFreqTxt = txtGenFreq.current?.value;
-    if (receptFreq && genFreqTxt) {
-      const cents = parseFloat(genFreqTxt);
-      genFreq = receptFreq * Math.pow(Math.pow(2, 1/1200), cents);
+    let testTone = null;
+    if (receptFreq && options.debugTestToneCents !== null) {
+      testTone = receptFreq * Math.pow(Math.pow(2, 1/1200), options.debugTestToneCents);
     }
 
     if (receptFreq) {
-      Tuner.setStrobeFreqs(tt, receptFreq, harmonics, genFreq);
+      Tuner.setStrobeFreqs(tt, receptFreq, harmonics, testTone);
     }
     last_strobes.current = [];
 
@@ -195,17 +190,17 @@ export function Analysis() {
 
   React.useEffect(() => {
     if (t) {
-      onUpdate(harmonics);
+      onUpdate();
       setConnecting(false);
     }
-  }, [t]);
+  }, [t, harmonics, options]);
 
   const onConnect = async () => {
     if (t) {
       Tuner.close(t);
       setT(null);
     } else {
-      onUpdate(harmonics);
+      onUpdate();
     }
   };
 
@@ -217,29 +212,17 @@ export function Analysis() {
     <div className="overlay">
       <div className="field is-grouped">
         <div className="control has-icons-left is-expanded">
-          <input type="number" min="10" max="5000" className="input is-large" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate(harmonics)} />
+          <input type="number" min="10" max="5000" className="input is-large" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate()} />
           <span className="icon is-left">
             <i className="fas fa-solid fa-music"></i>
           </span>
         </div>
         <Harmonics harmonics={harmonics} setHarmonics={h => {
           setHarmonics(h);
-          onUpdate(h);
         }} />
-        <div className="control settings">
-          <a className="button is-large">
-            <span className="icon">
-              <i className="fas fa-solid fa-sliders"></i>
-            </span>
-            <span>
-              settings
-            </span>
-          </a>
-        </div>
+        <Options.Options options={options} setOptions={setOptions} />
       </div>
 
-      <p><label className="text"><input type="number" className="text" placeholder="test tone (cent offset)" ref={txtGenFreq} onChange={() => onUpdate(harmonics)} /></label></p>
-      <p><label className="checkbox"><input type="checkbox" checked={debug} onChange={e => setDebug(e.target.checked)} /> debug</label></p>
       <div className="status-row">
         <div className="columns">
           <div className="status-text">
