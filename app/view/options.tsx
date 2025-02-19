@@ -1,7 +1,13 @@
 import React from "react";
 import * as Tuner from "../tuner";
+import { Number } from "./number";
 
 type T = {
+  strobeMinimumRms: number;
+  strobeMinimumNorm: number;
+  strobeMaximumVariance: number;
+  strobeDecay: number;
+
   debugTestToneCents: number | null;
   debugEnableDisplay: boolean;
 
@@ -16,6 +22,11 @@ type T = {
 }
 
 export let defaultOptions: T = {
+  strobeMinimumRms: 0.001,
+  strobeMinimumNorm: 0.50,
+  strobeMaximumVariance: 0.10,
+  strobeDecay: 0.95,
+
   debugTestToneCents: null,
   debugEnableDisplay: false,
 
@@ -72,6 +83,84 @@ export function Options({options, setOptions}: Props) {
         </div>
         <div className="dropdown-menu">
           <div className="dropdown-content">
+            <div className="level"><div className="level-item">strobe triggering</div></div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsStrobeMinimumRms">
+              trigger when rms exceeds
+            </label>
+              <div className="control">
+              <Number id="optionsStrobeMinimumRms" value={options.strobeMinimumRms} onChangeRequired={v => setOptions({...options, strobeMinimumRms: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsStrobeMinimumNorm">
+              trigger when norm exceeds
+            </label>
+              <div className="control">
+              <Number id="optionsStrobeMinimumNorm" value={options.strobeMinimumNorm} onChangeRequired={v => setOptions({...options, strobeMinimumNorm: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsStrobeMaximumVariance">
+              trigger when variance under
+            </label>
+              <div className="control">
+              <Number id="optionsStrobeMaximumVariance" value={options.strobeMaximumVariance} onChangeRequired={v => setOptions({...options, strobeMaximumVariance: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsStrobeDecay">
+              trigger decay rate
+            </label>
+              <div className="control">
+              <Number id="optionsStrobeDecay" value={options.strobeDecay} onChangeRequired={v => setOptions({...options, strobeDecay: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+
+            <div className="level"><div className="level-item">noise removal</div></div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsClipLimit">
+              noise gate threshold
+            </label>
+              <div className="control">
+              <Number id="optionsClipLimit" value={options.clipLimit} onChangeRequired={v => setOptions({...options, clipLimit: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+            <div className="level"><div className="level-item">exponential moving averages</div></div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsEmaFilterRms">
+              global rms filter
+            </label>
+              <div className="control">
+              <Number id="optionsEmaFilterRms" value={options.emaFilterRms} onChangeRequired={v => setOptions({...options, emaFilterRms: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsEmaFilterNorm">
+              per-harmonic norm filter
+            </label>
+              <div className="control">
+              <Number id="optionsEmaFilterNorm" value={options.emaFilterNorm} onChangeRequired={v => setOptions({...options, emaFilterNorm: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
+
+          <div className="field">
+            <label className="label" htmlFor="optionsEmaFilterAngle">
+              per-harmonic phase filter
+            </label>
+              <div className="control">
+              <Number id="optionsEmaFilterAngle" value={options.emaFilterAngle} onChangeRequired={v => setOptions({...options, emaFilterAngle: v})} min={0} max={1} step={0.01} />
+              </div>
+          </div>
 
             <div className="level"><div className="level-item">spectrogram</div></div>
 
@@ -82,17 +171,9 @@ export function Options({options, setOptions}: Props) {
               <div className="control">
       <div className="select">
         <select id="optionsFftWindowSize" value={options.fftWindowSize} onChange={e => setOptions({...options, fftWindowSize: parseInt(e.target.value)})}>
-          <option>32</option>
-          <option>64</option>
-          <option>128</option>
-          <option>256</option>
-          <option>512</option>
-          <option>1024</option>
-          <option>2048</option>
-          <option>4096</option>
-          <option>8192</option>
-          <option>16384</option>
-          <option>32768</option>
+          <option>32</option> <option>64</option> <option>128</option> <option>256</option>
+          <option>512</option> <option>1024</option> <option>2048</option> <option>4096</option>
+          <option>8192</option> <option>16384</option> <option>32768</option>
         </select>
       </div>
       </div>
@@ -100,28 +181,28 @@ export function Options({options, setOptions}: Props) {
 
           <div className="field">
             <label className="label" htmlFor="optionsFftSmoothing">
-              smoothing over time [0,1]
+              smoothing over time
             </label>
               <div className="control">
-              <input id="optionsFftSmoothing" type="number" className="input" value={options.fftSmoothing.toString()} onChange={e => setOptions({...options, fftSmoothing: parseFloat(e.target.value)})} />
+              <Number id="optionsFftSmoothing" value={options.fftSmoothing} onChangeRequired={v => setOptions({...options, fftSmoothing: v})} min={0} max={1} step={0.01} />
               </div>
           </div>
 
             <div className="level"><div className="level-item">debug</div></div>
 
           <div className="field">
+            <div className="control">
+            <label className="checkbox"><input type="checkbox" checked={options.debugEnableDisplay} onChange={e => setOptions({...options, debugEnableDisplay: e.target.checked})} /> display debug information</label>
+            </div>
+          </div>
+
+          <div className="field">
             <label className="label" htmlFor="optionsDebugTestTone">
               generate test tone (cent offset)
             </label>
               <div className="control">
-              <input id="optionsDebugTestTone" type="number" className="input" placeholder="test tone (cent offset)" value={options.debugTestToneCents?.toString() ?? ""} onChange={e => setOptions({...options, debugTestToneCents: tryParseFloat(e.target.value)})} />
+              <Number id="optionsDebugTestTone" placeholder="cents" value={options.debugTestToneCents} onChangeOptional={v => setOptions({...options, debugTestToneCents: v})} />
               </div>
-          </div>
-
-          <div className="field">
-            <div className="control">
-            <label className="checkbox"><input type="checkbox" checked={options.debugEnableDisplay} onChange={e => setOptions({...options, debugEnableDisplay: e.target.checked})} /> display debug information</label>
-            </div>
           </div>
 
 

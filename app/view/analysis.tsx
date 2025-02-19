@@ -132,10 +132,10 @@ export function Analysis() {
         const strobes: Tuner.Strobe[] = [];
         for (let i = 0; i != msg.strobes.length; ++i) {
           let strobe = msg.strobes[i];
-          if (msg.rms > 0.001 && strobe.norm >= 0.50 && strobe.angle_diff_variance < 0.10 || options.debugEnableDisplay) {
+          if (msg.rms > options.strobeMinimumRms && strobe.norm >= options.strobeMinimumNorm && strobe.angle_diff_variance < options.strobeMaximumVariance || options.debugEnableDisplay) {
             last_strobes.current[i] = strobe;
           } else if (last_strobes.current[i]) {
-            last_strobes.current[i].norm *= 0.95;
+            last_strobes.current[i].norm *= options.strobeDecay;
 
             strobe = last_strobes.current[i];
 
