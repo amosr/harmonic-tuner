@@ -2,7 +2,7 @@ import React from "react";
 import * as Tuner from "../tuner";
 import { Number } from "./number";
 
-type T = {
+export type T = {
   strobeMinimumRms: number;
   strobeMinimumNorm: number;
   strobeMaximumVariance: number;
@@ -51,7 +51,7 @@ export function makeOptions(options: T): Tuner.Options {
   return o;
 }
 
-type Props = {
+export type Props = {
   options: T,
   setOptions: React.Dispatch<T>,
 }
