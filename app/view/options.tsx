@@ -2,7 +2,12 @@ import React from "react";
 import * as Tuner from "../tuner";
 import { Number } from "./number";
 
+export type TuningMode = 'just' | 'chromatic';
+
 export type T = {
+  tuningMode: TuningMode;
+  tuningReference: number;
+
   strobeMinimumRms: number;
   strobeMinimumNorm: number;
   strobeMaximumVariance: number;
@@ -22,6 +27,9 @@ export type T = {
 }
 
 export let defaultOptions: T = {
+  tuningMode: 'chromatic',
+  tuningReference: 440,
+
   strobeMinimumRms: 0.001,
   strobeMinimumNorm: 0.50,
   strobeMaximumVariance: 0.10,
@@ -83,6 +91,31 @@ export function Options({options, setOptions}: Props) {
         </div>
         <div className="dropdown-menu">
           <div className="dropdown-content">
+            <div className="level"><div className="level-item">tuning</div></div>
+
+          <div className="field">
+              <div className="control">
+                <div className="radios">
+                  <label className="radio">
+                    <input type="radio" name="optionsTuningMode" onChange={e => { setOptions({ ...options, tuningMode: 'chromatic', tuningReference: 440 }) }} checked={options.tuningMode == 'chromatic'} />
+                    chromatic
+                  </label>
+                  <label className="radio">
+                    <input type="radio" name="optionsTuningMode" onChange={e => { setOptions({ ...options, tuningMode: 'just', tuningReference: 784 }) }} checked={options.tuningMode == 'just'} />
+                    just intonation
+                  </label>
+                </div>
+              </div>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="optionsTuningReference">
+              {options.tuningMode == 'chromatic' ? 'a4 pitch' : 'unity pitch 1/1'}
+            </label>
+              <div className="control">
+              <Number id="optionsTuningReference" value={options.tuningReference} onChangeRequired={v => setOptions({...options, tuningReference: v})} min={10} max={5000} step={1} key={options.tuningMode} />
+              </div>
+          </div>
+
             <div className="level"><div className="level-item">strobe triggering</div></div>
 
           <div className="field">

@@ -50,6 +50,10 @@ $tuner-font-size-sml: 20px;
   font-size: $tuner-font-size;
 }
 
+.note-select .just {
+  width: 4em;
+}
+
 .harmonics .button {
   @extend .is-large;
   width: 12em;

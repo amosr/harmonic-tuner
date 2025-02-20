@@ -9,6 +9,8 @@ type Props = {
   onChangeRequired?: React.Dispatch<number>
   id?: string,
   placeholder?: string
+  className?: string
+  ref?: React.RefObject<HTMLInputElement | null>
 }
 
 function tryParseFloat(v: string): number | null {
@@ -33,6 +35,6 @@ export function Number(props: Props) {
   }
 
   return <>
-      <input id={props.id} type="number" className="input" value={v} onChange={e => onChange(e.target.value)} min={props.min} max={props.max} step={props.step} placeholder={props.placeholder} />
+      <input id={props.id} type="number" className={props.className ?? "input"} value={v} onChange={e => onChange(e.target.value)} min={props.min} max={props.max} step={props.step} placeholder={props.placeholder} ref={props.ref} />
     </>;
 }

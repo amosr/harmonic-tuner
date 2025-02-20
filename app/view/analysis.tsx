@@ -4,6 +4,7 @@ import * as Tuner from "../tuner";
 import { Harmonics } from "./harmonics";
 import * as Options from "./options";
 import * as Display from "./display";
+import * as Note from "./note";
 
 export function Analysis() {
   // const [textStatus, setTextStatus] = React.useState("");
@@ -12,7 +13,7 @@ export function Analysis() {
 
   const [t, setT] = React.useState<Tuner.T | null>(null);
   const [trigger, setTrigger] = React.useState(false);
-  const txtReceptFreq = React.createRef<HTMLInputElement>();
+  const [note, setNote] = React.useState<number | null>(null);
 
   const [options, setOptions] = React.useState(Options.defaultOptions);
 
@@ -33,19 +34,13 @@ export function Analysis() {
 
     tt.options = opt;
 
-    let receptFreq = null;
-    let receptFreqTxt = txtReceptFreq.current?.value;
-    if (receptFreqTxt) {
-      receptFreq = parseFloat(receptFreqTxt);
-    }
-
     let testTone = null;
-    if (receptFreq && options.debugTestToneCents !== null) {
-      testTone = receptFreq * Math.pow(Math.pow(2, 1/1200), options.debugTestToneCents);
+    if (note && options.debugTestToneCents !== null) {
+      testTone = note * Math.pow(Math.pow(2, 1/1200), options.debugTestToneCents);
     }
 
-    if (receptFreq) {
-      Tuner.setStrobeFreqs(tt, receptFreq, harmonics, testTone);
+    if (note) {
+      Tuner.setStrobeFreqs(tt, note, harmonics, testTone);
     }
 
     setTrigger(!trigger);
@@ -56,7 +51,7 @@ export function Analysis() {
       onUpdate();
       setConnecting(false);
     }
-  }, [t, harmonics, options]);
+  }, [t, harmonics, options, note]);
 
   const onConnect = async () => {
     if (t) {
@@ -70,12 +65,7 @@ export function Analysis() {
   return (<>
     <div className="overlay">
       <div className="field is-grouped">
-        <div className="control has-icons-left is-expanded">
-          <input type="number" min="10" max="5000" className="input is-large" placeholder="receptive frequency (hz)" ref={txtReceptFreq} onChange={() => onUpdate()} />
-          <span className="icon is-left">
-            <i className="fas fa-solid fa-music"></i>
-          </span>
-        </div>
+        <Note.Note options={options} setNote={setNote} />
         <Harmonics harmonics={harmonics} setHarmonics={h => {
           setHarmonics(h);
         }} />
