@@ -85,7 +85,7 @@ export function Analysis() {
       <div className="status-row">
         <div className="columns">
           <div className="status-text">
-            {t ? <p ref={pStatus} /> : <p>-</p>}
+            <p ref={pStatus} className={t ? "" : "status-disabled"}>-</p>
           </div>
         <div className="status-connect">
           <a className={"button" + (connecting ? " is-loading": "") + (t ? " is-connected" : "")} onClick={onConnect}>
@@ -103,7 +103,7 @@ export function Analysis() {
 
     <Display.Display t={t} options={options} triggerExt={trigger}
     // try to avoid re-rendering all inputs every frame, so don't trigger a local state change
-      setStatusText={t => {if (pStatus.current) pStatus.current.nodeValue = t}}
+      setStatusText={t => {if (pStatus.current && pStatus.current.firstChild) pStatus.current.firstChild.nodeValue = t}}
       />
   </>);
 }

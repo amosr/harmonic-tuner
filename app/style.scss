@@ -114,6 +114,9 @@ $tuner-font-size-sml: 20px;
 .status-text p {
   padding: 24px 12px;
 }
+.status-text p.status-disabled {
+  color: rgb(80, 80, 80);
+}
 
 .status-connect {
   @extend .column;

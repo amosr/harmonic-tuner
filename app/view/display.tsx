@@ -21,7 +21,8 @@ function renderCanvas(t: Tuner.T, canv: HTMLCanvasElement, ctx: CanvasRenderingC
   ctx.strokeStyle = 'rgb(255,255,255)';
 
   const count = t.bytes.length;
-  const w_per_bucket = Tuner.getWOfBucket(t);
+  // overdraw to avoid anti-aliasing effects against white background
+  const w_per_bucket = Tuner.getWOfBucket(t) + 1;
   const h = canv.height;
   const maxCentDisplay = 400;
 
