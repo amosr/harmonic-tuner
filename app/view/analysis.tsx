@@ -7,8 +7,6 @@ import * as Display from "./display";
 import * as Note from "./note";
 
 export function Analysis() {
-  // const [textStatus, setTextStatus] = React.useState("");
-
   const pStatus = React.createRef<HTMLParagraphElement>();
 
   const [t, setT] = React.useState<Tuner.T | null>(null);

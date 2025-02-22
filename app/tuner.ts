@@ -80,6 +80,7 @@ export type T = {
   centreClip: AudioWorkletNode;
   options: Options;
   wakeLock: WakeLockSentinel | null;
+  onVisibilityChange: () => void;
 };
 
 export async function init(options: Options): Promise<T> {
@@ -104,20 +105,34 @@ export async function init(options: Options): Promise<T> {
   centreClip.connect(strober);
 
   const stroberMessage = { strobes: [], rms: 0 };
-  const result: T = { audio, analyser, media, bytes, strober, stroberMessage, centreClip, options, wakeLock: null };
+  const result: T = { audio, analyser, media, bytes, strober, stroberMessage, centreClip, options, wakeLock: null, onVisibilityChange: () => {} };
   strober.port.onmessage = (e) => {
     result.stroberMessage = e.data;
   };
 
-  // TODO: re-request lock on visibility change? https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API#reacquiring_a_wake_lock
-  navigator.wakeLock.request().then(w => {
-    result.wakeLock = w;
-  })
+  const requestWakeLock = () => {
+    navigator.wakeLock.request().then(w => {
+      result.wakeLock = w;
+      result.wakeLock.addEventListener("release", () => {
+        result.wakeLock = null;
+      })
+    });
+  };
+
+  result.onVisibilityChange = () => {
+    if (document.visibilityState == 'visible') {
+      requestWakeLock();
+    }
+  }
+
+  document.addEventListener("visibilitychange", result.onVisibilityChange);
+  requestWakeLock();
 
   return result;
 }
 
 export function close(t: T): void {
+  document.removeEventListener("visibilitychange", t.onVisibilityChange);
   t.audio.close();
   t.media.getTracks().forEach(x => x.stop());
   t.wakeLock?.release();
