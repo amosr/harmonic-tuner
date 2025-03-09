@@ -60,6 +60,27 @@ export function Analysis() {
     }
   };
 
+  // XXX: bug on ipad, when closing cover while microphone active then returning.
+  // audio connection state remains 'running', but audio does not get any updates.
+  // if (t) {
+  //   console.log(t.audio.state);
+  //   // TODO: run in audio state change handler?
+  //   if (t.audio.state == 'closed') {
+  //     Tuner.close(t);
+  //     setT(null);
+  //   } else if (t.audio.state == 'suspended') {
+  //     t.audio.resume();
+  //   }
+  // }
+  // const onVisibilityChange = () => {
+  //   if (document.visibilityState == 'visible')
+  //     setTrigger(!trigger);
+  // };
+  // React.useEffect(() => {
+  //   document.addEventListener("visibilitychange", onVisibilityChange);
+  //   return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  // }, [])
+
   return (<>
     <div className="overlay">
       <div className="field is-grouped">
