@@ -2,7 +2,7 @@ import React from "react";
 import * as Tuner from "../tuner";
 import { Number } from "./number";
 
-export type TuningMode = 'just' | 'chromatic';
+export type TuningMode = 'just' | 'chromatic' | 'diamond';
 
 export type T = {
   tuningMode: TuningMode;
@@ -103,6 +103,10 @@ export function Options({options, setOptions}: Props) {
                   <label className="radio">
                     <input type="radio" name="optionsTuningMode" onChange={e => { setOptions({ ...options, tuningMode: 'just', tuningReference: 784 }) }} checked={options.tuningMode == 'just'} />
                     just intonation
+                  </label>
+                  <label className="radio">
+                    <input type="radio" name="optionsTuningMode" onChange={e => { setOptions({ ...options, tuningMode: 'diamond', tuningReference: 784 }) }} checked={options.tuningMode == 'diamond'} />
+                    diamond
                   </label>
                 </div>
               </div>

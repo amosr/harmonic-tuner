@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type ChangeEvent } from "react";
 import * as Options from "./options";
 import { Number } from "./number";
 
@@ -7,10 +7,45 @@ export type Props = {
   setNote?: React.Dispatch<number | null>
 }
 
+let diamondJust = {
+  'A1': { type: 'just', num: 11, den: 8, octave: 1 },
+  'B1': { type: 'just', num: 9, den: 8, octave: 1 },
+  'B2': { type: 'just', num: 11, den: 10, octave: 1 },
+  'C1': { type: 'just', num: 7, den: 4, octave: 0 },
+  'C2': { type: 'just', num: 9, den: 5, octave: 0 },
+  'C3': { type: 'just', num: 11, den: 6, octave: 0 },
+  'D1': { type: 'just', num: 3, den: 2, octave: 0 },
+  'D2': { type: 'just', num: 7, den: 5, octave: 0 },
+  'D3': { type: 'just', num: 3, den: 2, octave: 0 },
+  'D4': { type: 'just', num: 11, den: 7, octave: 0 },
+  'E1': { type: 'just', num: 5, den: 4, octave: 0 },
+  'E2': { type: 'just', num: 6, den: 5, octave: 0 },
+  'E3': { type: 'just', num: 7, den: 6, octave: 0 },
+  'E4': { type: 'just', num: 9, den: 7, octave: 0 },
+  'E5': { type: 'just', num: 11, den: 9, octave: 0 },
+  'F.': { type: 'just', num: 1, den: 1, octave: 0 },
+  'G1': { type: 'just', num: 8, den: 5, octave: -1 },
+  'G2': { type: 'just', num: 5, den: 3, octave: -1 },
+  'G3': { type: 'just', num: 12, den: 7, octave: -1 },
+  'G4': { type: 'just', num: 14, den: 9, octave: -1 },
+  'G5': { type: 'just', num: 18, den: 11, octave: -1 },
+  'H1': { type: 'just', num: 4, den: 3, octave: -1 },
+  'H2': { type: 'just', num: 10, den: 7, octave: -1 },
+  'H3': { type: 'just', num: 4, den: 3, octave: -1 },
+  'H4': { type: 'just', num: 14, den: 11, octave: -1 },
+  'I1': { type: 'just', num: 8, den: 7, octave: -1 },
+  'I2': { type: 'just', num: 10, den: 9, octave: -1 },
+  'I3': { type: 'just', num: 12, den: 11, octave: -1 },
+  'J1': { type: 'just', num: 16, den: 9, octave: -2 },
+  'J2': { type: 'just', num: 20, den: 11, octave: -2 },
+  'K1': { type: 'just', num: 16, den: 11, octave: -2 },
+}
+
 type NoteFreq = { type: 'freq', freq: number }
 type NoteChromatic = { type: 'chromatic', note: number, octave: number }
 type NoteJust = { type: 'just', num: number, den: number, octave: number }
-type N = NoteFreq | NoteChromatic | NoteJust
+type NoteDiamond = { type: 'diamond', name: keyof(typeof diamondJust) }
+type N = NoteFreq | NoteChromatic | NoteJust | NoteDiamond
 
 function fixed3(n: number): number {
   return Math.round(n * 100) / 100;
@@ -25,6 +60,9 @@ function freqOfN(n: N, options: Options.T): number {
     return fixed3(Math.pow(2, 1/12 * nn) * options.tuningReference);
   } else if (n.type == 'just') {
     return fixed3((n.num / n.den) * options.tuningReference * Math.pow(2, n.octave));
+  } else if (n.type == 'diamond') {
+    let j = diamondJust[n.name];
+    return fixed3((j.num / j.den) * options.tuningReference * Math.pow(2, j.octave));
   }
   return n; //?
 }
@@ -34,6 +72,7 @@ export function Note({options, setNote}: Props) {
   // hmm, hack, refresh freq
   const [freqKey, setFreqKey] = React.useState<number>(0);
   const [justKey, setJustKey] = React.useState<number>(0);
+  const [diamKey, setDiamKey] = React.useState<number>(0);
 
   const setN = (n: N | null) => {
     setNX(n);
@@ -41,6 +80,8 @@ export function Note({options, setNote}: Props) {
       setFreqKey(freqKey + 1);
     if (n && n.type != 'just')
       setJustKey(justKey + 1);
+    if (n && n.type != 'diamond')
+      setDiamKey(diamKey + 1);
     if (setNote)
       setNote(n ? freqOfN(n, options) : null);
   }
@@ -99,6 +140,16 @@ export function Note({options, setNote}: Props) {
     setN(note);
   }
 
+  const setDiamond = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    let v = e.target.value;
+    if (v in diamondJust) {
+      // how to avoid cast?
+      let k = v as (keyof (typeof diamondJust));
+      let note = {type: 'diamond' as const, name: k};
+      setN(note);
+    }
+  }
+
   const setOctave = () => {
     if (options.tuningMode == 'just')
       setJust();
@@ -146,15 +197,19 @@ export function Note({options, setNote}: Props) {
         </select>
         </div>
       </div>
-      <div className="control">
+      <div className={options.tuningMode == 'diamond' ? 'control' : 'is-hidden'}>
+        <div className="select is-large">
+        <select value={n && n.type == 'diamond' ? n.name : ""} onChange={e => setDiamond(e)}>
+          {Object.keys(diamondJust).map(k => <option value={k}>{k}</option>)}
+        </select>
+        </div>
+      </div>
+      <div className={options.tuningMode == 'diamond' ? 'is-hidden' : 'control'}>
         <div className="button is-large is-static">
-          {/* <span className="icon is-left">
-            <i className="fas fa-solid fa-8"></i>
-          </span> */}
           8<sup>ve</sup>
         </div>
       </div>
-      <div className="control">
+      <div className={options.tuningMode == 'diamond' ? 'is-hidden' : 'control'}>
         <div className="select is-large">
           <select ref={octaveRef} value={n && (n.type == 'chromatic' || n.type == 'just') ? n.octave.toString() : "0"} onChange={setOctave}>
             {options.tuningMode == 'just' ?
